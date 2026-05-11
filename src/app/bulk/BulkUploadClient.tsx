@@ -168,7 +168,7 @@ export default function BulkUploadClient() {
           isDragging ? 'border-yellow-500 bg-yellow-500/10' : 'border-zinc-700 hover:border-zinc-500 hover:bg-zinc-800/50'
         }`}
       >
-        <input ref={inputRef} type="file" accept="image/*" multiple onChange={handleFileInput} className="hidden" />
+        <input ref={inputRef} type="file" accept="image/*" multiple onChange={handleFileInput} onClick={(e) => e.stopPropagation()} className="hidden" />
         <div className="flex flex-col items-center gap-3">
           <div className="w-14 h-14 rounded-full bg-yellow-500/10 flex items-center justify-center">
             <Layers className="w-7 h-7 text-yellow-400" />
