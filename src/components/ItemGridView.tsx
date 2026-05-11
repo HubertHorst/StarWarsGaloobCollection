@@ -1,12 +1,14 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { Item } from '@/types/item'
 import ItemCard from '@/components/ItemCard'
 import BulkActionBar from '@/components/BulkActionBar'
-import { Loader2, Merge, CheckSquare, Square } from 'lucide-react'
+import { Loader2, Merge, CheckSquare, Square, ChevronUp, ChevronDown, X } from 'lucide-react'
+import { CONDITION_PRESETS } from '@/lib/conditionPresets'
+import { SERIES_PRESETS } from '@/lib/seriesPresets'
 
 interface Props {
   items: Item[]
@@ -15,22 +17,81 @@ interface Props {
 
 interface PendingMerge { source: Item; target: Item }
 
-function coverSrc(item: Item) {
-  if (!item.cover_url) return null
-  return item.cover_url
+type SortField = 'name' | 'serie' | 'jahr' | 'wert' | 'kaufpreis' | 'lieferung_ausstehend' | 'in_sammlung'
+type SortDir = 'asc' | 'desc'
+
+function parseValue(v: string | null): number {
+  if (!v) return -1
+  return parseFloat(v.replace(',', '.').replace(/[^0-9.]/g, '')) || 0
 }
+
+function coverSrc(item: Item) {
+  return item.cover_url ?? null
+}
+
+const SORT_LABELS: Record<SortField, string> = {
+  name:                 'Name',
+  serie:                'Serie',
+  jahr:                 'Jahr',
+  wert:                 'Wert',
+  kaufpreis:            'Kaufpreis',
+  lieferung_ausstehend: 'Lieferung',
+  in_sammlung:          'Sammlung',
+}
+
+const sel = 'bg-zinc-800/70 text-zinc-300 text-xs rounded-lg px-2 py-1.5 outline-none ring-1 ring-white/10 focus:ring-yellow-500 cursor-pointer hover:bg-zinc-700/70 transition-colors'
 
 export default function ItemGridView({ items: initialItems, editMode = false }: Props) {
   const router = useRouter()
 
   const [selectedIds, setSelectedIds] = useState<string[]>([])
-
-  const [items, setItems] = useState<Item[]>(initialItems)
-  useEffect(() => { setItems(initialItems) }, [initialItems])
+  const [dragItems, setDragItems] = useState<Item[]>(initialItems)
+  useEffect(() => { setDragItems(initialItems) }, [initialItems])
   const [dragId, setDragId] = useState<string | null>(null)
   const [overId, setOverId] = useState<string | null>(null)
   const [pending, setPending] = useState<PendingMerge | null>(null)
   const [merging, setMerging] = useState(false)
+
+  // ── Filter / sort state ────────────────────────────────────────────────────
+  const [filters, setFilters] = useState({
+    name: '', serie: '', zustand: '', lieferung: '', sammlung: '',
+  })
+  const [sort, setSort] = useState<{ field: SortField; dir: SortDir }>({ field: 'name', dir: 'asc' })
+
+  const hasFilters = filters.name || filters.serie || filters.zustand || filters.lieferung || filters.sammlung
+
+  const filtered = useMemo(() => {
+    return initialItems
+      .filter((item) => {
+        if (filters.name && !item.name.toLowerCase().includes(filters.name.toLowerCase())) return false
+        if (filters.serie && item.serie !== filters.serie) return false
+        if (filters.zustand && (item.zustand ?? '').toLowerCase() !== filters.zustand.toLowerCase()) return false
+        if (filters.lieferung !== '' && String(item.lieferung_ausstehend ?? 0) !== filters.lieferung) return false
+        if (filters.sammlung !== '' && String(item.in_sammlung ?? 1) !== filters.sammlung) return false
+        return true
+      })
+      .sort((a, b) => {
+        const dir = sort.dir === 'asc' ? 1 : -1
+        switch (sort.field) {
+          case 'name':                 return dir * a.name.localeCompare(b.name)
+          case 'serie':                return dir * (a.serie ?? '').localeCompare(b.serie ?? '')
+          case 'jahr':                 return dir * ((a.jahr ?? 0) - (b.jahr ?? 0))
+          case 'wert':                 return dir * (parseValue(a.wert) - parseValue(b.wert))
+          case 'kaufpreis':            return dir * (parseValue(a.kaufpreis) - parseValue(b.kaufpreis))
+          case 'lieferung_ausstehend': return dir * ((a.lieferung_ausstehend ?? 0) - (b.lieferung_ausstehend ?? 0))
+          case 'in_sammlung':          return dir * ((a.in_sammlung ?? 1) - (b.in_sammlung ?? 1))
+          default:                     return 0
+        }
+      })
+  }, [initialItems, filters, sort])
+
+  function toggleDir() {
+    setSort((s) => ({ ...s, dir: s.dir === 'asc' ? 'desc' : 'asc' }))
+  }
+
+  function clearFilters() {
+    setFilters({ name: '', serie: '', zustand: '', lieferung: '', sammlung: '' })
+  }
 
   function toggleSelect(id: string) {
     setSelectedIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id])
@@ -45,30 +106,118 @@ export default function ItemGridView({ items: initialItems, editMode = false }: 
       body: JSON.stringify({ sourceId: pending.source.id, targetId: pending.target.id }),
     })
     setMerging(false)
-    setItems((prev) => prev.filter((i) => i.id !== pending.source.id))
+    setDragItems((prev) => prev.filter((i) => i.id !== pending.source.id))
     setSelectedIds((prev) => prev.filter((id) => id !== pending.source.id))
     setPending(null)
     router.refresh()
   }
 
+  // ── Filter / sort toolbar (shared by both modes) ───────────────────────────
+  const toolbar = (
+    <div className="flex flex-wrap items-center gap-2 mb-4 p-3 bg-zinc-900 rounded-xl border border-white/5 text-xs">
+      {/* Name search */}
+      <input
+        value={filters.name}
+        onChange={(e) => setFilters((f) => ({ ...f, name: e.target.value }))}
+        placeholder="Name suchen…"
+        className="flex-1 min-w-36 bg-zinc-800/70 text-zinc-300 rounded-lg px-2.5 py-1.5 outline-none ring-1 ring-white/10 focus:ring-yellow-500 placeholder-zinc-600 transition-colors text-xs"
+      />
+
+      {/* Serie */}
+      <select value={filters.serie} onChange={(e) => setFilters((f) => ({ ...f, serie: e.target.value }))} className={sel}>
+        <option value="">Alle Serien</option>
+        {SERIES_PRESETS.map((s) => <option key={s} value={s}>{s}</option>)}
+      </select>
+
+      {/* Zustand */}
+      <select value={filters.zustand} onChange={(e) => setFilters((f) => ({ ...f, zustand: e.target.value }))} className={sel}>
+        <option value="">Alle Zustände</option>
+        {CONDITION_PRESETS.map((p) => <option key={p} value={p}>{p}</option>)}
+      </select>
+
+      {/* Lieferung */}
+      <select value={filters.lieferung} onChange={(e) => setFilters((f) => ({ ...f, lieferung: e.target.value }))} title="Lieferstatus" className={sel}>
+        <option value="">Alle Lieferungen</option>
+        <option value="1">🚚 Ausstehend</option>
+        <option value="0">✓ Erhalten</option>
+      </select>
+
+      {/* Sammlung */}
+      <select value={filters.sammlung} onChange={(e) => setFilters((f) => ({ ...f, sammlung: e.target.value }))} title="Sammelstatus" className={sel}>
+        <option value="">Alle Status</option>
+        <option value="1">✅ Vorhanden</option>
+        <option value="0">❌ Fehlt</option>
+      </select>
+
+      {/* Divider */}
+      <div className="hidden sm:block w-px h-5 bg-white/10 flex-shrink-0" />
+
+      {/* Sort field */}
+      <select value={sort.field} onChange={(e) => setSort((s) => ({ ...s, field: e.target.value as SortField }))} className={sel}>
+        {(Object.entries(SORT_LABELS) as [SortField, string][]).map(([k, v]) => (
+          <option key={k} value={k}>{v}</option>
+        ))}
+      </select>
+
+      {/* Sort direction toggle */}
+      <button
+        onClick={toggleDir}
+        title={sort.dir === 'asc' ? 'Aufsteigend' : 'Absteigend'}
+        className="flex items-center gap-1 bg-zinc-800/70 hover:bg-zinc-700/70 text-zinc-300 rounded-lg px-2 py-1.5 ring-1 ring-white/10 transition-colors"
+      >
+        {sort.dir === 'asc'
+          ? <ChevronUp className="w-3.5 h-3.5 text-yellow-400" />
+          : <ChevronDown className="w-3.5 h-3.5 text-yellow-400" />}
+      </button>
+
+      {/* Clear filters */}
+      {hasFilters && (
+        <button
+          onClick={clearFilters}
+          title="Filter zurücksetzen"
+          className="flex items-center gap-1 text-zinc-500 hover:text-white transition-colors px-1.5 py-1.5 rounded-lg hover:bg-zinc-800"
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
+      )}
+
+      {/* Count */}
+      <span className="ml-auto text-zinc-500 flex-shrink-0">
+        {filtered.length !== initialItems.length
+          ? <><span className="text-white">{filtered.length}</span> / {initialItems.length}</>
+          : <>{initialItems.length} Artikel</>}
+      </span>
+    </div>
+  )
+
+  // ── Normal (non-edit) mode ─────────────────────────────────────────────────
   if (!editMode) {
     return (
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-        {initialItems.map((item) => <ItemCard key={item.id} item={item} />)}
-      </div>
+      <>
+        {toolbar}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+          {filtered.map((item) => <ItemCard key={item.id} item={item} />)}
+        </div>
+        {filtered.length === 0 && (
+          <p className="text-center text-zinc-600 text-sm py-16">Keine Artikel gefunden</p>
+        )}
+      </>
     )
   }
 
-  const allSelected = items.length > 0 && items.every((i) => selectedIds.includes(i.id))
+  // ── Edit mode ──────────────────────────────────────────────────────────────
+  const allSelected = filtered.length > 0 && filtered.every((i) => selectedIds.includes(i.id))
 
   return (
     <>
+      {toolbar}
+
       {/* Select-all bar */}
       <div className="flex items-center gap-2 mb-2 text-sm text-zinc-400">
         <button
           onClick={() => allSelected
-            ? setSelectedIds([])
-            : setSelectedIds(items.map((i) => i.id))
+            ? setSelectedIds((prev) => prev.filter((id) => !filtered.some((i) => i.id === id)))
+            : setSelectedIds((prev) => [...new Set([...prev, ...filtered.map((i) => i.id)])])
           }
           className="flex items-center gap-1.5 hover:text-white transition-colors"
         >
@@ -82,7 +231,7 @@ export default function ItemGridView({ items: initialItems, editMode = false }: 
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-        {items.map((item) => {
+        {filtered.map((item) => {
           const cover = coverSrc(item)
           const isDragging = dragId === item.id
           const isOver = overId === item.id && dragId !== item.id
@@ -99,7 +248,7 @@ export default function ItemGridView({ items: initialItems, editMode = false }: 
               onDrop={(e) => {
                 e.preventDefault()
                 setOverId(null)
-                const src = items.find((i) => i.id === dragId)
+                const src = dragItems.find((i) => i.id === dragId)
                 if (!src || src.id === item.id) return
                 setPending({ source: src, target: item })
                 setDragId(null)
@@ -144,7 +293,11 @@ export default function ItemGridView({ items: initialItems, editMode = false }: 
         })}
       </div>
 
-      <BulkActionBar selectedIds={selectedIds} onClear={() => setSelectedIds([])} items={items} />
+      {filtered.length === 0 && (
+        <p className="text-center text-zinc-600 text-sm py-16">Keine Artikel gefunden</p>
+      )}
+
+      <BulkActionBar selectedIds={selectedIds} onClear={() => setSelectedIds([])} items={dragItems} />
 
       {/* Merge confirmation dialog */}
       {pending && (
