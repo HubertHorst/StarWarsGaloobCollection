@@ -34,6 +34,7 @@ export default function CoverSearchModal({ items, onClose, onApplied }: Props) {
   const [selected, setSelected] = useState<string | null>(null)
   const [applying, setApplying] = useState(false)
   const [applyError, setApplyError] = useState<string | null>(null)
+  const [searchError, setSearchError] = useState<string | null>(null)
   const [doneIndices, setDoneIndices] = useState<Set<number>>(new Set())
 
   const currentItem = items[queueIndex]
@@ -56,13 +57,16 @@ export default function CoverSearchModal({ items, onClose, onApplied }: Props) {
     setResults([])
     setBrokenUrls(new Set())
     setSelected(null)
+    setSearchError(null)
     try {
       const res = await fetch(`/api/cover-search?q=${encodeURIComponent(q.trim())}`)
       const data = await res.json()
-      setResults(data.urls ?? [])
-      if (data.error) console.error('cover-search API error:', data.error)
+      const urls: string[] = data.urls ?? []
+      setResults(urls)
+      if (data.error) setSearchError(`API: ${data.error}`)
+      else if (urls.length === 0) setSearchError('API returned 0 URLs')
     } catch (e) {
-      console.error('cover-search fetch error:', e)
+      setSearchError(`Fetch failed: ${e}`)
       setResults([])
     } finally {
       setLoading(false)
@@ -168,7 +172,13 @@ export default function CoverSearchModal({ items, onClose, onApplied }: Props) {
             <div className="flex flex-col items-center justify-center py-16 gap-2 text-zinc-500">
               <Search className="w-8 h-8 text-zinc-700" />
               <p className="text-sm">Keine Ergebnisse gefunden</p>
-              <p className="text-xs text-zinc-600">Suchbegriff anpassen und erneut suchen</p>
+              {searchError ? (
+                <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded px-3 py-1.5 max-w-xs text-center">{searchError}</p>
+              ) : results.length > 0 ? (
+                <p className="text-xs text-zinc-500">{results.length} URLs geladen, {brokenUrls.size} fehlgeschlagen</p>
+              ) : (
+                <p className="text-xs text-zinc-600">Suchbegriff anpassen und erneut suchen</p>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-4 sm:grid-cols-5 gap-3">
