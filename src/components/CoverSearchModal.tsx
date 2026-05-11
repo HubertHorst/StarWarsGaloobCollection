@@ -68,11 +68,8 @@ export default function CoverSearchModal({ items, onClose, onApplied }: Props) {
       } else if (urls.length === 0) {
         // Show full debug info so we can diagnose server-side
         const d = data.debug ?? {}
-        const detail = d.error
-          ? `ERROR: ${d.error}`
-          : `results:${d.resultCount} imgLen:${d.imgBodyLen}`
         setSearchError(
-          `initStatus:${d.initStatus} bodyLen:${d.initBodyLen} vqd:${d.vqd ?? 'null'} | vqdCtx: ${d.vqdContext ?? 'n/a'} | ${detail}`
+          `status:${d.status} bodyLen:${d.bodyLen} hits:${d.rawHits ?? 0} results:${d.resultCount ?? 0}${d.error ? ' ERR:' + d.error : ''}`
         )
       }
     } catch (e) {
