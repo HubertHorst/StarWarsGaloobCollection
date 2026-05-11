@@ -39,20 +39,41 @@ function statusColor(status: ItemStatus): string {
   }
 }
 
-function isAccepted(file: File): boolean {
-  const name = file.name.toLowerCase()
+function isHeic(file: File): boolean {
   return (
-    file.type.startsWith('image/') ||
-    file.type === 'video/mp4' ||
-    file.type === 'video/quicktime' ||
-    name.endsWith('.heic') ||
-    name.endsWith('.heif') ||
-    name.endsWith('.mp4') ||
-    name.endsWith('.mov')
+    file.type === 'image/heic' ||
+    file.type === 'image/heif' ||
+    file.name.toLowerCase().endsWith('.heic') ||
+    file.name.toLowerCase().endsWith('.heif')
   )
 }
 
-/** Extract the first frame of a video file as a JPEG File */
+function isVideo(file: File): boolean {
+  return (
+    file.type.startsWith('video/') ||
+    file.name.toLowerCase().endsWith('.mp4') ||
+    file.name.toLowerCase().endsWith('.mov')
+  )
+}
+
+function isAccepted(file: File): boolean {
+  return file.type.startsWith('image/') || isHeic(file) || isVideo(file)
+}
+
+/** Convert HEIC/HEIF to JPEG using heic2any (browser-only) */
+async function convertHeic(file: File): Promise<File> {
+  try {
+    const heic2any = (await import('heic2any')).default
+    const result = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.85 })
+    const blob = Array.isArray(result) ? result[0] : result
+    const newName = file.name.replace(/\.(heic|heif)$/i, '.jpg')
+    return new File([blob], newName, { type: 'image/jpeg' })
+  } catch {
+    return file
+  }
+}
+
+/** Extract the first frame of an MP4/MOV as a JPEG */
 async function extractVideoFrame(file: File): Promise<File> {
   return new Promise((resolve) => {
     const video = document.createElement('video')
@@ -60,7 +81,6 @@ async function extractVideoFrame(file: File): Promise<File> {
     video.src = url
     video.muted = true
     video.playsInline = true
-    video.crossOrigin = 'anonymous'
 
     const capture = () => {
       URL.revokeObjectURL(url)
@@ -70,11 +90,10 @@ async function extractVideoFrame(file: File): Promise<File> {
       canvas.getContext('2d')!.drawImage(video, 0, 0)
       canvas.toBlob(
         (blob) => {
-          if (blob) {
-            resolve(new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' }))
-          } else {
-            resolve(file)
-          }
+          resolve(blob
+            ? new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' })
+            : file
+          )
         },
         'image/jpeg',
         0.85
@@ -87,28 +106,45 @@ async function extractVideoFrame(file: File): Promise<File> {
   })
 }
 
+/** Normalise any file to a JPEG-compatible image File */
+async function toImageFile(file: File): Promise<File> {
+  if (isHeic(file)) return convertHeic(file)
+  if (isVideo(file)) return extractVideoFrame(file)
+  return file
+}
+
 export default function BulkUploadClient() {
   const inputRef = useRef<HTMLInputElement>(null)
   const [items, setItems] = useState<BulkItem[]>([])
   const [running, setRunning] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
+  const [converting, setConverting] = useState(false)
 
   function updateItem(id: string, patch: Partial<BulkItem>) {
     setItems((prev) => prev.map((i) => (i.id === id ? { ...i, ...patch } : i)))
   }
 
-  function addFiles(files: File[]) {
+  async function addFiles(files: File[]) {
     const accepted = files.filter(isAccepted)
-    const newItems: BulkItem[] = accepted.map((file) => ({
-      id: crypto.randomUUID(),
-      file,
-      preview: URL.createObjectURL(file),
-      status: 'queued',
-      name: null,
-      serie: null,
-      errorMsg: null,
-      itemId: null,
-    }))
+    if (accepted.length === 0) return
+
+    setConverting(true)
+    const newItems = await Promise.all(
+      accepted.map(async (file) => {
+        const imageFile = await toImageFile(file)
+        return {
+          id: crypto.randomUUID(),
+          file: imageFile,
+          preview: URL.createObjectURL(imageFile),
+          status: 'queued' as ItemStatus,
+          name: null,
+          serie: null,
+          errorMsg: null,
+          itemId: null,
+        }
+      })
+    )
+    setConverting(false)
     setItems((prev) => [...prev, ...newItems])
   }
 
@@ -125,14 +161,7 @@ export default function BulkUploadClient() {
   const processItem = useCallback(async (item: BulkItem) => {
     try {
       updateItem(item.id, { status: 'uploading' })
-
-      // For video files (MP4/MOV from Live Photos), extract a still frame first
-      const isVideo = item.file.type.startsWith('video/') ||
-        item.file.name.toLowerCase().endsWith('.mp4') ||
-        item.file.name.toLowerCase().endsWith('.mov')
-
-      const imageFile = isVideo ? await extractVideoFrame(item.file) : item.file
-      const compressed = await compressImage(imageFile)
+      const compressed = await compressImage(item.file)
 
       const coverFd = new FormData()
       coverFd.append('file', compressed)
@@ -161,15 +190,7 @@ export default function BulkUploadClient() {
       const saveRes = await fetch('/api/items', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name,
-          serie,
-          set_nummer,
-          jahr,
-          zustand,
-          cover_url: coverUrl,
-          user_photos: coverUrl ? [coverUrl] : null,
-        }),
+        body: JSON.stringify({ name, serie, set_nummer, jahr, zustand, cover_url: coverUrl, user_photos: coverUrl ? [coverUrl] : null }),
       })
 
       if (!saveRes.ok) throw new Error('Speichern fehlgeschlagen')
@@ -187,12 +208,9 @@ export default function BulkUploadClient() {
     const queued = items.filter((i) => i.status === 'queued' || i.status === 'error')
     if (queued.length === 0) return
     setRunning(true)
-
     for (let i = 0; i < queued.length; i += BATCH_SIZE) {
-      const batch = queued.slice(i, i + BATCH_SIZE)
-      await Promise.all(batch.map(processItem))
+      await Promise.all(queued.slice(i, i + BATCH_SIZE).map(processItem))
     }
-
     setRunning(false)
   }
 
@@ -230,13 +248,22 @@ export default function BulkUploadClient() {
           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
         />
         <div className="flex flex-col items-center gap-3 pointer-events-none">
-          <div className="w-14 h-14 rounded-full bg-yellow-500/10 flex items-center justify-center">
-            <Layers className="w-7 h-7 text-yellow-400" />
-          </div>
-          <div>
-            <p className="text-white font-semibold">Fotos hierher ziehen oder klicken zum Auswählen</p>
-            <p className="text-zinc-500 text-sm mt-1">JPG, PNG, HEIC, MP4 (Live Photos) — bis zu 100 Dateien</p>
-          </div>
+          {converting ? (
+            <>
+              <Loader2 className="w-10 h-10 text-yellow-400 animate-spin" />
+              <p className="text-zinc-400 text-sm">HEIC/MP4 wird konvertiert…</p>
+            </>
+          ) : (
+            <>
+              <div className="w-14 h-14 rounded-full bg-yellow-500/10 flex items-center justify-center">
+                <Layers className="w-7 h-7 text-yellow-400" />
+              </div>
+              <div>
+                <p className="text-white font-semibold">Fotos hierher ziehen oder klicken zum Auswählen</p>
+                <p className="text-zinc-500 text-sm mt-1">JPG · PNG · HEIC · MP4 (Live Photos) — bis zu 100 Dateien</p>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -268,11 +295,10 @@ export default function BulkUploadClient() {
                 disabled={running || pending === 0}
                 className="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold px-6 py-2.5 rounded-xl transition-colors"
               >
-                {running ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" /> Verarbeite {pending} Dateien…</>
-                ) : (
-                  <><Upload className="w-4 h-4" /> Import starten ({pending} Dateien)</>
-                )}
+                {running
+                  ? <><Loader2 className="w-4 h-4 animate-spin" /> Verarbeite {pending} Dateien…</>
+                  : <><Upload className="w-4 h-4" /> Import starten ({pending} Dateien)</>
+                }
               </button>
             )}
             {allDone && (
@@ -295,74 +321,44 @@ export default function BulkUploadClient() {
 
           {/* Image grid */}
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
-            {items.map((item) => {
-              const isVideo = item.file.type.startsWith('video/') ||
-                item.file.name.toLowerCase().endsWith('.mp4') ||
-                item.file.name.toLowerCase().endsWith('.mov')
-              return (
-                <div key={item.id} className="space-y-1.5">
-                  <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-zinc-800 ring-1 ring-white/5">
-                    {isVideo ? (
-                      <video
-                        src={item.preview}
-                        className="absolute inset-0 w-full h-full object-cover"
-                        muted
-                        playsInline
-                      />
-                    ) : (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={item.preview}
-                        alt=""
-                        className="absolute inset-0 w-full h-full object-cover"
-                      />
-                    )}
+            {items.map((item) => (
+              <div key={item.id} className="space-y-1.5">
+                <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-zinc-800 ring-1 ring-white/5">
+                  {/* Always a JPEG at this point — plain img tag, no Next.js Image restrictions */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={item.preview} alt="" className="absolute inset-0 w-full h-full object-cover" />
 
-                    {/* Status overlay */}
-                    <div className={`absolute inset-0 flex items-center justify-center transition-all ${
-                      item.status === 'done' ? 'bg-black/20' :
-                      item.status === 'error' ? 'bg-red-900/40' :
-                      item.status === 'queued' ? 'bg-black/0' :
-                      'bg-black/60'
-                    }`}>
-                      {item.status === 'done' && (
-                        <CheckCircle2 className="w-8 h-8 text-green-400 drop-shadow-lg" />
-                      )}
-                      {item.status === 'error' && (
-                        <XCircle className="w-8 h-8 text-red-400 drop-shadow-lg" />
-                      )}
-                      {['uploading', 'identifying', 'saving'].includes(item.status) && (
-                        <Loader2 className="w-8 h-8 text-white animate-spin drop-shadow-lg" />
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Name + status */}
-                  <div className="px-0.5">
-                    <p className="text-white text-xs font-medium leading-tight truncate">
-                      {item.name ?? item.file.name.replace(/\.[^.]+$/, '')}
-                    </p>
-                    {item.serie && (
-                      <p className="text-zinc-500 text-xs truncate">{item.serie}</p>
+                  {/* Status overlay */}
+                  <div className={`absolute inset-0 flex items-center justify-center transition-all ${
+                    item.status === 'done' ? 'bg-black/20' :
+                    item.status === 'error' ? 'bg-red-900/40' :
+                    item.status === 'queued' ? 'bg-black/0' : 'bg-black/60'
+                  }`}>
+                    {item.status === 'done' && <CheckCircle2 className="w-8 h-8 text-green-400 drop-shadow-lg" />}
+                    {item.status === 'error' && <XCircle className="w-8 h-8 text-red-400 drop-shadow-lg" />}
+                    {['uploading', 'identifying', 'saving'].includes(item.status) && (
+                      <Loader2 className="w-8 h-8 text-white animate-spin drop-shadow-lg" />
                     )}
-                    <p className={`text-xs mt-0.5 ${statusColor(item.status)}`}>
-                      {item.status === 'done' && item.itemId ? (
-                        <Link href={`/items/${item.itemId}`} className="hover:underline">
-                          {statusLabel(item)}
-                        </Link>
-                      ) : item.status === 'error' ? (
-                        <span className="flex items-center gap-0.5">
-                          <AlertCircle className="w-3 h-3" />
-                          {statusLabel(item)}
-                        </span>
-                      ) : (
-                        statusLabel(item)
-                      )}
-                    </p>
                   </div>
                 </div>
-              )
-            })}
+
+                <div className="px-0.5">
+                  <p className="text-white text-xs font-medium leading-tight truncate">
+                    {item.name ?? item.file.name.replace(/\.[^.]+$/, '')}
+                  </p>
+                  {item.serie && <p className="text-zinc-500 text-xs truncate">{item.serie}</p>}
+                  <p className={`text-xs mt-0.5 ${statusColor(item.status)}`}>
+                    {item.status === 'done' && item.itemId ? (
+                      <Link href={`/items/${item.itemId}`} className="hover:underline">{statusLabel(item)}</Link>
+                    ) : item.status === 'error' ? (
+                      <span className="flex items-center gap-0.5">
+                        <AlertCircle className="w-3 h-3" />{statusLabel(item)}
+                      </span>
+                    ) : statusLabel(item)}
+                  </p>
+                </div>
+              </div>
+            ))}
           </div>
         </>
       )}
