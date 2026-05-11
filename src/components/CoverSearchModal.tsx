@@ -164,7 +164,7 @@ export default function CoverSearchModal({ items, onClose, onApplied }: Props) {
               <p className="text-xs text-zinc-600">Suchbegriff anpassen und erneut suchen</p>
             </div>
           ) : (
-            <div className="grid grid-cols-4 gap-3">
+            <div className="grid grid-cols-4 sm:grid-cols-5 gap-3">
               {results.map((url, i) => {
                 const isBroken = brokenUrls.has(url)
                 const isSelected = selected === url
