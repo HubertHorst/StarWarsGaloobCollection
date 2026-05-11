@@ -11,7 +11,7 @@ interface Props {
   items: Item[]
 }
 
-type SortField = 'name' | 'zustand' | 'serie' | 'jahr' | 'set_nummer' | 'kaufpreis' | 'wert'
+type SortField = 'name' | 'zustand' | 'serie' | 'jahr' | 'set_nummer' | 'kaufpreis' | 'wert' | 'lieferung_ausstehend' | 'in_sammlung'
 type SortDir = 'asc' | 'desc'
 
 function parseValue(v: string | null): number {
@@ -20,7 +20,7 @@ function parseValue(v: string | null): number {
 }
 
 export default function ItemListView({ items }: Props) {
-  const [filters, setFilters] = useState({ name: '', zustand: '', serie: '', jahr: '', set_nummer: '', wert: '' })
+  const [filters, setFilters] = useState({ name: '', zustand: '', serie: '', jahr: '', set_nummer: '', wert: '', lieferung: '', sammlung: '' })
   const [sort, setSort] = useState<{ field: SortField; dir: SortDir }>({ field: 'name', dir: 'asc' })
   const [selectedIds, setSelectedIds] = useState<string[]>([])
 
@@ -38,6 +38,12 @@ export default function ItemListView({ items }: Props) {
         }
         if (filters.set_nummer && !(item.set_nummer ?? '').toLowerCase().includes(filters.set_nummer.toLowerCase())) return false
         if (filters.wert && !(item.wert ?? '').toLowerCase().includes(filters.wert.toLowerCase())) return false
+        if (filters.lieferung !== '') {
+          if (String(item.lieferung_ausstehend ?? 0) !== filters.lieferung) return false
+        }
+        if (filters.sammlung !== '') {
+          if (String(item.in_sammlung ?? 1) !== filters.sammlung) return false
+        }
         return true
       })
       .sort((a, b) => {
@@ -48,9 +54,11 @@ export default function ItemListView({ items }: Props) {
           case 'serie':     return dir * (a.serie ?? '').localeCompare(b.serie ?? '')
           case 'jahr':      return dir * ((a.jahr ?? 0) - (b.jahr ?? 0))
           case 'set_nummer':return dir * (a.set_nummer ?? '').localeCompare(b.set_nummer ?? '')
-          case 'kaufpreis': return dir * (parseValue(a.kaufpreis) - parseValue(b.kaufpreis))
-          case 'wert':      return dir * (parseValue(a.wert) - parseValue(b.wert))
-          default:          return 0
+          case 'kaufpreis':           return dir * (parseValue(a.kaufpreis) - parseValue(b.kaufpreis))
+          case 'wert':                return dir * (parseValue(a.wert) - parseValue(b.wert))
+          case 'lieferung_ausstehend':return dir * ((a.lieferung_ausstehend ?? 0) - (b.lieferung_ausstehend ?? 0))
+          case 'in_sammlung':         return dir * ((a.in_sammlung ?? 1) - (b.in_sammlung ?? 1))
+          default:                    return 0
         }
       })
   }, [items, filters, sort])
@@ -103,6 +111,7 @@ export default function ItemListView({ items }: Props) {
           w-12 jahr      (sm+)
           w-16 set_nummer (md+)
           w-10 lieferung  (sm+)
+          w-8  sammlung  (sm+)
           w-8  refresh   (sm+)
           w-20 kaufpreis  (lg+)
           w-20 wert      (lg+)
@@ -132,7 +141,12 @@ export default function ItemListView({ items }: Props) {
           <button className={`hidden md:flex w-16 flex-shrink-0 text-right justify-end ${headerBtn}`} onClick={() => toggleSort('set_nummer')}>
             Set-Nr <SortIcon field="set_nummer" />
           </button>
-          <div className="w-10 flex-shrink-0 text-center">Lief.</div>
+          <button className={`w-10 flex-shrink-0 justify-center ${headerBtn}`} onClick={() => toggleSort('lieferung_ausstehend')}>
+            Lief.<SortIcon field="lieferung_ausstehend" />
+          </button>
+          <button className={`w-8 flex-shrink-0 justify-center ${headerBtn}`} onClick={() => toggleSort('in_sammlung')}>
+            <SortIcon field="in_sammlung" />
+          </button>
           <div className="w-8 flex-shrink-0" />
           <button className={`hidden lg:flex w-20 flex-shrink-0 text-right justify-end ${headerBtn}`} onClick={() => toggleSort('kaufpreis')}>
             Kauf <SortIcon field="kaufpreis" />
@@ -182,7 +196,26 @@ export default function ItemListView({ items }: Props) {
             placeholder="Set-Nr…"
             className={`hidden md:block w-16 flex-shrink-0 ${filterInput}`}
           />
-          <div className="w-10 flex-shrink-0" />
+          <select
+            value={filters.lieferung}
+            onChange={(e) => setFilters((f) => ({ ...f, lieferung: e.target.value }))}
+            title="Lieferstatus filtern"
+            className={`w-10 flex-shrink-0 ${filterSelect}`}
+          >
+            <option value="">Alle</option>
+            <option value="1">🚚</option>
+            <option value="0">✓</option>
+          </select>
+          <select
+            value={filters.sammlung}
+            onChange={(e) => setFilters((f) => ({ ...f, sammlung: e.target.value }))}
+            title="Sammelstatus filtern"
+            className={`w-8 flex-shrink-0 ${filterSelect}`}
+          >
+            <option value="">Alle</option>
+            <option value="1">✅</option>
+            <option value="0">❌</option>
+          </select>
           <div className="w-8 flex-shrink-0" />
           <div className="hidden lg:block w-20 flex-shrink-0" />
           <input
