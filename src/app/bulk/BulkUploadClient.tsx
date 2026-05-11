@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
-import { Upload, CheckCircle2, XCircle, Loader2, AlertCircle, Layers } from 'lucide-react'
+import { Upload, CheckCircle2, XCircle, Loader2, AlertCircle, Layers, Merge } from 'lucide-react'
 import { compressImage } from '@/lib/compressImage'
 
 type ItemStatus = 'queued' | 'uploading' | 'identifying' | 'saving' | 'done' | 'error'
@@ -302,13 +302,22 @@ export default function BulkUploadClient() {
               </button>
             )}
             {allDone && (
-              <Link
-                href="/"
-                className="flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white font-semibold px-6 py-2.5 rounded-xl transition-colors"
-              >
-                <CheckCircle2 className="w-4 h-4" />
-                Fertig — Sammlung ansehen
-              </Link>
+              <>
+                <Link
+                  href="/"
+                  className="flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white font-semibold px-6 py-2.5 rounded-xl transition-colors"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  Sammlung ansehen
+                </Link>
+                <Link
+                  href="/?edit=1"
+                  className="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-500 text-white font-semibold px-6 py-2.5 rounded-xl transition-colors"
+                >
+                  <Merge className="w-4 h-4" />
+                  Zusammenführen
+                </Link>
+              </>
             )}
             <button
               onClick={() => { setItems([]); setRunning(false) }}
