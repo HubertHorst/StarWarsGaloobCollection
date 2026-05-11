@@ -55,7 +55,9 @@ export default function CoverSearchModal({ items, onClose, onApplied }: Props) {
       const res = await fetch(`/api/cover-search?q=${encodeURIComponent(q.trim())}`)
       const data = await res.json()
       setResults(data.urls ?? [])
-    } catch {
+      if (data.error) console.error('cover-search API error:', data.error)
+    } catch (e) {
+      console.error('cover-search fetch error:', e)
       setResults([])
     } finally {
       setLoading(false)
