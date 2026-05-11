@@ -11,6 +11,13 @@ interface Props {
   onToggle?: () => void
 }
 
+function statusRing(item: Item, selected?: boolean): string {
+  if (selected) return 'ring-2 ring-indigo-500/70'
+  if (item.lieferung_ausstehend === 1) return 'ring-2 ring-yellow-500/70 group-hover:ring-yellow-400'
+  if ((item.in_sammlung ?? 1) === 0)   return 'ring-2 ring-red-500/70   group-hover:ring-red-400'
+  return                                       'ring-2 ring-green-500/50  group-hover:ring-green-400/80'
+}
+
 export default function ItemCard({ item, selected, onToggle }: Props) {
   return (
     <div className="group relative block">
@@ -31,9 +38,7 @@ export default function ItemCard({ item, selected, onToggle }: Props) {
         className="block"
         onClick={() => sessionStorage.setItem('library-scroll', String(window.scrollY))}
       >
-      <div className={`relative aspect-[3/4] rounded-xl overflow-hidden bg-zinc-800 shadow-lg ring-1 transition-all duration-200 group-hover:shadow-yellow-500/20 group-hover:shadow-xl group-hover:-translate-y-1 ${
-        selected ? 'ring-indigo-500/70' : 'ring-white/5 group-hover:ring-yellow-500/50'
-      }`}>
+      <div className={`relative aspect-[3/4] rounded-xl overflow-hidden bg-zinc-800 shadow-lg transition-all duration-200 group-hover:shadow-xl group-hover:-translate-y-1 ${statusRing(item, selected)}`}>
         {item.cover_url ? (
           <CoverZoom
             src={item.cover_url}

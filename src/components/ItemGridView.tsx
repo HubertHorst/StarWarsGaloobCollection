@@ -29,6 +29,12 @@ function coverSrc(item: Item) {
   return item.cover_url ?? null
 }
 
+function statusRing(item: Item): string {
+  if (item.lieferung_ausstehend === 1) return 'ring-2 ring-yellow-500/70'
+  if ((item.in_sammlung ?? 1) === 0)   return 'ring-2 ring-red-500/70'
+  return                                       'ring-2 ring-green-500/50'
+}
+
 const SORT_LABELS: Record<SortField, string> = {
   name:                 'Name',
   serie:                'Serie',
@@ -256,8 +262,9 @@ export default function ItemGridView({ items: initialItems, editMode = false }: 
               className={[
                 'relative rounded-xl overflow-hidden cursor-grab active:cursor-grabbing transition-all duration-150 select-none',
                 isDragging ? 'opacity-40 scale-95' : 'opacity-100',
-                isOver ? 'ring-4 ring-yellow-500 scale-105 shadow-xl shadow-yellow-500/30'
-                  : isSelected ? 'ring-2 ring-indigo-400' : 'ring-1 ring-white/10',
+                isOver     ? 'ring-4 ring-yellow-500 scale-105 shadow-xl shadow-yellow-500/30'
+                : isSelected ? 'ring-2 ring-indigo-400'
+                : statusRing(item),
               ].join(' ')}
             >
               {/* Checkbox */}
