@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { Plus, Layers, Star } from 'lucide-react'
 import EditModeToggle from '@/components/EditModeToggle'
-import { initDb } from '@/lib/db'
+import { getDb, initDb } from '@/lib/db'
 import { safeParseJson } from '@/lib/validate'
 import ItemGridView from '@/components/ItemGridView'
 import ItemListView from '@/components/ItemListView'
