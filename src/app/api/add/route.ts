@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDbReady } from '@/lib/db'
 import { randomUUID } from 'crypto'
+import { DEFAULT_CONDITION } from '@/lib/conditionPresets'
 
 export async function POST(req: NextRequest) {
   try {
@@ -22,7 +23,7 @@ export async function POST(req: NextRequest) {
         body.serie ?? null,
         body.set_nummer ?? null,
         body.jahr ?? null,
-        body.zustand ?? null,
+        body.zustand ?? DEFAULT_CONDITION,
         body.wert ?? null,
         body.kaufpreis ?? null,
         body.lieferung_ausstehend ?? 0,

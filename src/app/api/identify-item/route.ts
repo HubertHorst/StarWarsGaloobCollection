@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
             },
             {
               type: 'text',
-              text: 'Look at this image and identify the Star Wars Galoob collectible item. Return JSON: { "name": "item name", "serie": "Micro Machines|Action Fleet|Epic Force|...", "set_nummer": "set number if visible or null", "jahr": year_as_number_or_null, "zustand": "OVP (ungeöffnet)|Neu|Sehr gut|Gut|Gebraucht|Beschädigt" }. If you cannot identify the item, return { "name": null, "serie": null, "set_nummer": null, "jahr": null, "zustand": null }.',
+              text: 'Look at this image and identify the Star Wars Galoob collectible item. Return JSON: { "name": "item name", "serie": "Micro Machines|Action Fleet|Epic Force|...", "set_nummer": "set number if visible or null", "jahr": year_as_number_or_null, "zustand": "Neu in Box|Box Neuwertig|Box mit Gebrauchspuren|Box Beschädigt" }. If you cannot identify the item, return { "name": null, "serie": null, "set_nummer": null, "jahr": null, "zustand": null }.',
             },
           ],
         },

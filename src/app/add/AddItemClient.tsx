@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { Upload, Camera, CheckCircle2, Loader2, AlertCircle, X, ImagePlus } from 'lucide-react'
 import { compressImage } from '@/lib/compressImage'
-import { CONDITION_PRESETS } from '@/lib/conditionPresets'
+import { CONDITION_PRESETS, DEFAULT_CONDITION } from '@/lib/conditionPresets'
 
 type Step = 'upload' | 'identifying' | 'results' | 'saving'
 
@@ -20,7 +20,7 @@ interface EditForm {
 }
 
 const emptyForm: EditForm = {
-  name: '', serie: '', set_nummer: '', jahr: '', zustand: '', wert: '', kaufpreis: '',
+  name: '', serie: '', set_nummer: '', jahr: '', zustand: DEFAULT_CONDITION, wert: '', kaufpreis: '',
 }
 
 export default function AddItemClient() {
@@ -77,7 +77,7 @@ export default function AddItemClient() {
             serie: data.serie ?? '',
             set_nummer: data.set_nummer ?? '',
             jahr: data.jahr ? String(data.jahr) : '',
-            zustand: data.zustand ?? '',
+            zustand: data.zustand ?? DEFAULT_CONDITION,
           }))
         }
       }

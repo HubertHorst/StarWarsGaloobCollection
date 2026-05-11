@@ -3,6 +3,7 @@ import { getDbReady } from '@/lib/db'
 import { safeParseJson } from '@/lib/validate'
 import { Item } from '@/types/item'
 import { randomUUID } from 'crypto'
+import { DEFAULT_CONDITION } from '@/lib/conditionPresets'
 
 function parseItem(row: Record<string, unknown>): Item {
   return {
@@ -54,7 +55,7 @@ export async function POST(req: NextRequest) {
         body.serie ?? null,
         body.set_nummer ?? null,
         body.jahr ?? null,
-        body.zustand ?? null,
+        body.zustand ?? DEFAULT_CONDITION,
         body.wert ?? null,
         body.kaufpreis ?? null,
         body.lieferung_ausstehend ?? 0,

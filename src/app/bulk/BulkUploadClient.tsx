@@ -4,6 +4,7 @@ import { useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { Upload, CheckCircle2, XCircle, Loader2, AlertCircle, Layers, Merge } from 'lucide-react'
 import { compressImage } from '@/lib/compressImage'
+import { DEFAULT_CONDITION } from '@/lib/conditionPresets'
 
 type ItemStatus = 'queued' | 'uploading' | 'identifying' | 'saving' | 'done' | 'error'
 
@@ -188,7 +189,7 @@ export default function BulkUploadClient() {
       const serie = identifyData.serie ?? null
       const set_nummer = identifyData.set_nummer ?? null
       const jahr = identifyData.jahr ?? null
-      const zustand = identifyData.zustand ?? null
+      const zustand = identifyData.zustand ?? DEFAULT_CONDITION
 
       updateItem(item.id, { name, serie })
       updateItem(item.id, { status: 'saving' })
