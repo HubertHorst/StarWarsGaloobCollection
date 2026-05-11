@@ -18,6 +18,17 @@ interface BulkItem {
   itemId: string | null
 }
 
+interface PendingMerge {
+  sourceLocalId: string
+  sourceName: string
+  sourcePreview: string
+  targetLocalId: string
+  targetName: string
+  targetPreview: string
+  sourceItemId: string
+  targetItemId: string
+}
+
 const BATCH_SIZE = 5
 
 function statusLabel(item: BulkItem): string {
@@ -60,7 +71,6 @@ function isAccepted(file: File): boolean {
   return file.type.startsWith('image/') || isHeic(file) || isVideo(file)
 }
 
-/** Convert HEIC/HEIF to JPEG using heic2any (browser-only) */
 async function convertHeic(file: File): Promise<File> {
   try {
     const heic2any = (await import('heic2any')).default
@@ -73,7 +83,6 @@ async function convertHeic(file: File): Promise<File> {
   }
 }
 
-/** Extract the first frame of an MP4/MOV as a JPEG */
 async function extractVideoFrame(file: File): Promise<File> {
   return new Promise((resolve) => {
     const video = document.createElement('video')
@@ -81,7 +90,6 @@ async function extractVideoFrame(file: File): Promise<File> {
     video.src = url
     video.muted = true
     video.playsInline = true
-
     const capture = () => {
       URL.revokeObjectURL(url)
       const canvas = document.createElement('canvas')
@@ -89,24 +97,18 @@ async function extractVideoFrame(file: File): Promise<File> {
       canvas.height = video.videoHeight || 480
       canvas.getContext('2d')!.drawImage(video, 0, 0)
       canvas.toBlob(
-        (blob) => {
-          resolve(blob
-            ? new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' })
-            : file
-          )
-        },
-        'image/jpeg',
-        0.85
+        (blob) => resolve(blob
+          ? new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' })
+          : file),
+        'image/jpeg', 0.85
       )
     }
-
     video.onseeked = capture
     video.onloadeddata = () => { video.currentTime = 0.5 }
     video.onerror = () => { URL.revokeObjectURL(url); resolve(file) }
   })
 }
 
-/** Normalise any file to a JPEG-compatible image File */
 async function toImageFile(file: File): Promise<File> {
   if (isHeic(file)) return convertHeic(file)
   if (isVideo(file)) return extractVideoFrame(file)
@@ -120,6 +122,12 @@ export default function BulkUploadClient() {
   const [isDragging, setIsDragging] = useState(false)
   const [converting, setConverting] = useState(false)
 
+  // merge state
+  const [dragId, setDragId] = useState<string | null>(null)
+  const [overId, setOverId] = useState<string | null>(null)
+  const [pending, setPending] = useState<PendingMerge | null>(null)
+  const [merging, setMerging] = useState(false)
+
   function updateItem(id: string, patch: Partial<BulkItem>) {
     setItems((prev) => prev.map((i) => (i.id === id ? { ...i, ...patch } : i)))
   }
@@ -127,7 +135,6 @@ export default function BulkUploadClient() {
   async function addFiles(files: File[]) {
     const accepted = files.filter(isAccepted)
     if (accepted.length === 0) return
-
     setConverting(true)
     const newItems = await Promise.all(
       accepted.map(async (file) => {
@@ -152,7 +159,7 @@ export default function BulkUploadClient() {
     if (e.target.files) addFiles(Array.from(e.target.files))
   }
 
-  function handleDrop(e: React.DragEvent) {
+  function handleDropZone(e: React.DragEvent) {
     e.preventDefault()
     setIsDragging(false)
     addFiles(Array.from(e.dataTransfer.files))
@@ -165,7 +172,6 @@ export default function BulkUploadClient() {
 
       const coverFd = new FormData()
       coverFd.append('file', compressed)
-
       const identifyFd = new FormData()
       identifyFd.append('image', compressed)
 
@@ -185,8 +191,8 @@ export default function BulkUploadClient() {
       const zustand = identifyData.zustand ?? null
 
       updateItem(item.id, { name, serie })
-
       updateItem(item.id, { status: 'saving' })
+
       const saveRes = await fetch('/api/items', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -214,12 +220,26 @@ export default function BulkUploadClient() {
     setRunning(false)
   }
 
+  async function confirmMerge() {
+    if (!pending) return
+    setMerging(true)
+    await fetch('/api/items/merge', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sourceId: pending.sourceItemId, targetId: pending.targetItemId }),
+    })
+    setMerging(false)
+    setItems((prev) => prev.filter((i) => i.id !== pending.sourceLocalId))
+    setPending(null)
+  }
+
   const done = items.filter((i) => i.status === 'done').length
   const errors = items.filter((i) => i.status === 'error').length
-  const pending = items.filter((i) => i.status === 'queued').length
+  const pending_count = items.filter((i) => i.status === 'queued').length
   const total = items.length
   const progress = total > 0 ? Math.round((done + errors) / total * 100) : 0
   const allDone = total > 0 && done + errors === total && !running
+  const hasDone = done > 0
 
   return (
     <div className="space-y-6">
@@ -234,7 +254,7 @@ export default function BulkUploadClient() {
       <div
         onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
         onDragLeave={() => setIsDragging(false)}
-        onDrop={handleDrop}
+        onDrop={handleDropZone}
         className={`relative border-2 border-dashed rounded-2xl p-10 text-center transition-all ${
           isDragging ? 'border-yellow-500 bg-yellow-500/10' : 'border-zinc-700 hover:border-zinc-500 hover:bg-zinc-800/50'
         }`}
@@ -276,7 +296,7 @@ export default function BulkUploadClient() {
               <div className="flex gap-4 text-xs">
                 <span className="text-green-400">{done} gespeichert</span>
                 {errors > 0 && <span className="text-red-400">{errors} Fehler</span>}
-                {pending > 0 && <span className="text-zinc-500">{pending} wartend</span>}
+                {pending_count > 0 && <span className="text-zinc-500">{pending_count} wartend</span>}
               </div>
             </div>
             <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
@@ -288,36 +308,27 @@ export default function BulkUploadClient() {
           </div>
 
           {/* Action buttons */}
-          <div className="flex gap-3">
+          <div className="flex gap-3 flex-wrap">
             {!allDone && (
               <button
                 onClick={runBulk}
-                disabled={running || pending === 0}
+                disabled={running || pending_count === 0}
                 className="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold px-6 py-2.5 rounded-xl transition-colors"
               >
                 {running
-                  ? <><Loader2 className="w-4 h-4 animate-spin" /> Verarbeite {pending} Dateien…</>
-                  : <><Upload className="w-4 h-4" /> Import starten ({pending} Dateien)</>
+                  ? <><Loader2 className="w-4 h-4 animate-spin" /> Verarbeite {pending_count} Dateien…</>
+                  : <><Upload className="w-4 h-4" /> Import starten ({pending_count} Dateien)</>
                 }
               </button>
             )}
             {allDone && (
-              <>
-                <Link
-                  href="/"
-                  className="flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white font-semibold px-6 py-2.5 rounded-xl transition-colors"
-                >
-                  <CheckCircle2 className="w-4 h-4" />
-                  Sammlung ansehen
-                </Link>
-                <Link
-                  href="/?edit=1"
-                  className="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-500 text-white font-semibold px-6 py-2.5 rounded-xl transition-colors"
-                >
-                  <Merge className="w-4 h-4" />
-                  Zusammenführen
-                </Link>
-              </>
+              <Link
+                href="/"
+                className="flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white font-semibold px-6 py-2.5 rounded-xl transition-colors"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                Sammlung ansehen
+              </Link>
             )}
             <button
               onClick={() => { setItems([]); setRunning(false) }}
@@ -328,48 +339,168 @@ export default function BulkUploadClient() {
             </button>
           </div>
 
-          {/* Image grid */}
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
-            {items.map((item) => (
-              <div key={item.id} className="space-y-1.5">
-                <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-zinc-800 ring-1 ring-white/5">
-                  {/* Always a JPEG at this point — plain img tag, no Next.js Image restrictions */}
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={item.preview} alt="" className="absolute inset-0 w-full h-full object-cover" />
+          {/* Merge hint — shown as soon as at least 2 done items exist */}
+          {done >= 2 && (
+            <p className="text-xs text-zinc-500 flex items-center gap-1.5">
+              <Merge className="w-3.5 h-3.5 text-yellow-500" />
+              Duplikate? Artikel auf einen anderen ziehen zum Zusammenführen.
+            </p>
+          )}
 
-                  {/* Status overlay */}
-                  <div className={`absolute inset-0 flex items-center justify-center transition-all ${
-                    item.status === 'done' ? 'bg-black/20' :
-                    item.status === 'error' ? 'bg-red-900/40' :
-                    item.status === 'queued' ? 'bg-black/0' : 'bg-black/60'
-                  }`}>
-                    {item.status === 'done' && <CheckCircle2 className="w-8 h-8 text-green-400 drop-shadow-lg" />}
-                    {item.status === 'error' && <XCircle className="w-8 h-8 text-red-400 drop-shadow-lg" />}
-                    {['uploading', 'identifying', 'saving'].includes(item.status) && (
-                      <Loader2 className="w-8 h-8 text-white animate-spin drop-shadow-lg" />
+          {/* Image grid — done items are draggable for merging */}
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
+            {items.map((item) => {
+              const isDraggingThis = dragId === item.id
+              const isOver = overId === item.id && dragId !== item.id
+              const canMerge = item.status === 'done' && item.itemId !== null
+
+              return (
+                <div
+                  key={item.id}
+                  draggable={canMerge}
+                  onDragStart={(e) => {
+                    if (!canMerge) return
+                    setDragId(item.id)
+                    e.dataTransfer.effectAllowed = 'move'
+                  }}
+                  onDragEnd={() => { setDragId(null); setOverId(null) }}
+                  onDragOver={(e) => {
+                    if (!canMerge || item.id === dragId) return
+                    e.preventDefault()
+                    setOverId(item.id)
+                  }}
+                  onDragLeave={(e) => {
+                    if (!e.currentTarget.contains(e.relatedTarget as Node)) setOverId(null)
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault()
+                    setOverId(null)
+                    const src = items.find((i) => i.id === dragId)
+                    if (!src || src.id === item.id || !src.itemId || !item.itemId) return
+                    setPending({
+                      sourceLocalId: src.id,
+                      sourceName: src.name ?? src.file.name,
+                      sourcePreview: src.preview,
+                      targetLocalId: item.id,
+                      targetName: item.name ?? item.file.name,
+                      targetPreview: item.preview,
+                      sourceItemId: src.itemId,
+                      targetItemId: item.itemId,
+                    })
+                    setDragId(null)
+                  }}
+                  className={[
+                    'space-y-1.5',
+                    canMerge ? 'cursor-grab active:cursor-grabbing' : '',
+                    isDraggingThis ? 'opacity-40 scale-95' : '',
+                  ].join(' ')}
+                >
+                  <div className={[
+                    'relative aspect-[3/4] rounded-xl overflow-hidden bg-zinc-800 transition-all duration-150',
+                    isOver ? 'ring-4 ring-yellow-500 scale-105 shadow-xl shadow-yellow-500/30' : 'ring-1 ring-white/5',
+                  ].join(' ')}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={item.preview} alt="" className="absolute inset-0 w-full h-full object-cover" />
+
+                    {/* Status overlay */}
+                    <div className={`absolute inset-0 flex items-center justify-center transition-all ${
+                      item.status === 'done' ? 'bg-black/0' :
+                      item.status === 'error' ? 'bg-red-900/40' :
+                      item.status === 'queued' ? 'bg-black/0' : 'bg-black/60'
+                    }`}>
+                      {item.status === 'done' && !isOver && (
+                        <CheckCircle2 className="w-6 h-6 text-green-400 drop-shadow-lg opacity-70" />
+                      )}
+                      {item.status === 'error' && <XCircle className="w-8 h-8 text-red-400 drop-shadow-lg" />}
+                      {['uploading', 'identifying', 'saving'].includes(item.status) && (
+                        <Loader2 className="w-8 h-8 text-white animate-spin drop-shadow-lg" />
+                      )}
+                    </div>
+
+                    {/* Merge drop target overlay */}
+                    {isOver && (
+                      <div className="absolute inset-0 bg-yellow-600/40 flex items-center justify-center">
+                        <Merge className="w-8 h-8 text-white drop-shadow-lg" />
+                      </div>
                     )}
                   </div>
-                </div>
 
-                <div className="px-0.5">
-                  <p className="text-white text-xs font-medium leading-tight truncate">
-                    {item.name ?? item.file.name.replace(/\.[^.]+$/, '')}
-                  </p>
-                  {item.serie && <p className="text-zinc-500 text-xs truncate">{item.serie}</p>}
-                  <p className={`text-xs mt-0.5 ${statusColor(item.status)}`}>
-                    {item.status === 'done' && item.itemId ? (
-                      <Link href={`/items/${item.itemId}`} className="hover:underline">{statusLabel(item)}</Link>
-                    ) : item.status === 'error' ? (
-                      <span className="flex items-center gap-0.5">
-                        <AlertCircle className="w-3 h-3" />{statusLabel(item)}
-                      </span>
-                    ) : statusLabel(item)}
-                  </p>
+                  <div className="px-0.5">
+                    <p className="text-white text-xs font-medium leading-tight truncate">
+                      {item.name ?? item.file.name.replace(/\.[^.]+$/, '')}
+                    </p>
+                    {item.serie && <p className="text-zinc-500 text-xs truncate">{item.serie}</p>}
+                    <p className={`text-xs mt-0.5 ${statusColor(item.status)}`}>
+                      {item.status === 'done' && item.itemId ? (
+                        <Link href={`/items/${item.itemId}`} className="hover:underline">{statusLabel(item)}</Link>
+                      ) : item.status === 'error' ? (
+                        <span className="flex items-center gap-0.5">
+                          <AlertCircle className="w-3 h-3" />{statusLabel(item)}
+                        </span>
+                      ) : statusLabel(item)}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
+
+          {/* Show collection link at bottom once items are done */}
+          {hasDone && !allDone && (
+            <p className="text-xs text-zinc-600 text-center">
+              Bereits gespeicherte Artikel können jetzt zusammengeführt werden.
+            </p>
+          )}
         </>
+      )}
+
+      {/* Merge confirmation dialog */}
+      {pending && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-zinc-900 border border-white/10 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+            <h2 className="text-lg font-bold mb-4">Artikel zusammenführen?</h2>
+            <div className="flex items-center gap-3 mb-6">
+              <div className="flex-1 text-center">
+                <div className="relative w-16 aspect-[3/4] rounded-lg overflow-hidden mx-auto mb-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={pending.sourcePreview} alt={pending.sourceName} className="absolute inset-0 w-full h-full object-cover" />
+                </div>
+                <p className="text-xs text-zinc-400 line-clamp-2">{pending.sourceName}</p>
+                <p className="text-xs text-red-400 mt-1">wird gelöscht</p>
+              </div>
+              <Merge className="w-6 h-6 text-yellow-400 flex-shrink-0" />
+              <div className="flex-1 text-center">
+                <div className="relative w-16 aspect-[3/4] rounded-lg overflow-hidden mx-auto mb-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={pending.targetPreview} alt={pending.targetName} className="absolute inset-0 w-full h-full object-cover" />
+                </div>
+                <p className="text-xs text-zinc-400 line-clamp-2">{pending.targetName}</p>
+                <p className="text-xs text-yellow-400 mt-1">erhält alle Bilder</p>
+              </div>
+            </div>
+            <p className="text-zinc-500 text-xs mb-5">
+              Alle Fotos von <span className="text-white">{pending.sourceName}</span> werden zu{' '}
+              <span className="text-white">{pending.targetName}</span> verschoben. Der Originaleintrag wird danach gelöscht.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setPending(null)}
+                disabled={merging}
+                className="flex-1 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm transition-colors"
+              >
+                Abbrechen
+              </button>
+              <button
+                onClick={confirmMerge}
+                disabled={merging}
+                className="flex-1 py-2 rounded-lg bg-yellow-600 hover:bg-yellow-500 text-white text-sm font-medium transition-colors flex items-center justify-center gap-2"
+              >
+                {merging ? <Loader2 className="w-4 h-4 animate-spin" /> : <Merge className="w-4 h-4" />}
+                Zusammenführen
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
