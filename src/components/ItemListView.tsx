@@ -93,6 +93,13 @@ export default function ItemListView({ items }: Props) {
   }, 0)
   const itemsWithWert = filtered.filter((i) => i.wert).length
 
+  const totalKaufpreis = filtered.reduce((sum, i) => {
+    if (!i.kaufpreis) return sum
+    const n = parseFloat(i.kaufpreis.replace(',', '.').replace(/[^0-9.]/g, ''))
+    return sum + (isNaN(n) ? 0 : n)
+  }, 0)
+  const itemsWithKaufpreis = filtered.filter((i) => i.kaufpreis).length
+
   const headerBtn = 'flex items-center gap-0.5 hover:text-white transition-colors cursor-pointer select-none'
   const filterInput = 'bg-zinc-800/60 text-zinc-300 text-xs rounded px-1.5 py-1 outline-none ring-1 ring-white/5 focus:ring-yellow-500 placeholder-zinc-600'
   const filterSelect = filterInput + ' cursor-pointer'
@@ -242,15 +249,37 @@ export default function ItemListView({ items }: Props) {
       )}
 
       {/* Total footer */}
-      {itemsWithWert > 0 && (
-        <div className="border-t border-white/10 px-4 py-3 flex items-center justify-between text-sm text-zinc-500">
-          <span className="text-xs">{filtered.length} von {items.length} Artikeln</span>
-          <span>
-            {itemsWithWert} bewertet ·{' '}
-            <span className="font-semibold text-white">
-              {totalWert.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
+      {(itemsWithWert > 0 || itemsWithKaufpreis > 0) && (
+        <div className="border-t border-white/10 px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-1 text-xs text-zinc-500">
+          <span>{filtered.length} von {items.length} Artikeln</span>
+          <span className="flex-1" />
+          {itemsWithKaufpreis > 0 && (
+            <span className="flex items-center gap-1.5">
+              <span className="text-zinc-600">Kaufpreis</span>
+              <span className="text-zinc-400">
+                {itemsWithKaufpreis} Einträge
+              </span>
+              <span className="text-white/20">·</span>
+              <span className="font-semibold text-white">
+                {totalKaufpreis.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
+              </span>
             </span>
-          </span>
+          )}
+          {itemsWithWert > 0 && itemsWithKaufpreis > 0 && (
+            <span className="text-white/10">|</span>
+          )}
+          {itemsWithWert > 0 && (
+            <span className="flex items-center gap-1.5">
+              <span className="text-zinc-600">Wert</span>
+              <span className="text-zinc-400">
+                {itemsWithWert} bewertet
+              </span>
+              <span className="text-white/20">·</span>
+              <span className="font-semibold text-yellow-400">
+                {totalWert.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
+              </span>
+            </span>
+          )}
         </div>
       )}
     </div>
