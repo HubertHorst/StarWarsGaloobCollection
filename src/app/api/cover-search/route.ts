@@ -27,13 +27,29 @@ async function searchDDG(q: string): Promise<{ urls: string[]; debug: Record<str
   const initBody = await initRes.text()
   debug.initBodyLen = initBody.length
 
-  const m = initBody.match(/vqd=['"]?([\d-]+)['"]?/)
-  const vqd = m?.[1]
+  // Try several vqd patterns — DDG occasionally changes the format
+  const vqdPatterns = [
+    /vqd=['"]?([\d-]+)['"]?/,            // digits+hyphens (original)
+    /"vqd"\s*:\s*"([^"]+)"/,             // JSON key
+    /vqd=([a-zA-Z0-9_%-]+)/,             // alphanumeric / percent-encoded
+    /[&?]vqd=([^&"'<>\s]+)/,             // query-string style
+    /vqd\\?["']?\s*[:=]\s*\\?["']?([^\\&"'<>\s,;]+)/, // escaped variants
+  ]
+  let vqd: string | undefined
+  for (const p of vqdPatterns) {
+    const m = initBody.match(p)
+    if (m?.[1]) { vqd = m[1]; debug.vqdPattern = p.toString(); break }
+  }
+
+  // Debug: find where "vqd" appears in the body
+  const vqdIdx = initBody.indexOf('vqd')
   debug.vqd = vqd ?? null
+  debug.vqdIdx = vqdIdx
+  debug.vqdContext = vqdIdx >= 0 ? initBody.substring(Math.max(0, vqdIdx - 10), vqdIdx + 60) : 'NOT FOUND'
+  debug.bodyStart = initBody.substring(0, 200)
 
   if (!vqd) {
     debug.error = 'vqd token not found'
-    debug.bodySnippet = initBody.substring(0, 400)
     return { urls: [], debug }
   }
 
