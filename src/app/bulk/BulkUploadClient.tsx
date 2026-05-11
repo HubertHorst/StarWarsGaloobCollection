@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { Upload, CheckCircle2, XCircle, Loader2, AlertCircle, Layers } from 'lucide-react'
@@ -41,7 +41,6 @@ function statusColor(status: ItemStatus): string {
 }
 
 export default function BulkUploadClient() {
-  const inputRef = useRef<HTMLInputElement>(null)
   const [items, setItems] = useState<BulkItem[]>([])
   const [running, setRunning] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
@@ -159,16 +158,15 @@ export default function BulkUploadClient() {
       </div>
 
       {/* Drop zone */}
-      <div
+      <label
         onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
         onDragLeave={() => setIsDragging(false)}
         onDrop={handleDrop}
-        onClick={() => inputRef.current?.click()}
-        className={`border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-all ${
+        className={`block border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-all ${
           isDragging ? 'border-yellow-500 bg-yellow-500/10' : 'border-zinc-700 hover:border-zinc-500 hover:bg-zinc-800/50'
         }`}
       >
-        <input ref={inputRef} type="file" accept="image/*" multiple onChange={handleFileInput} onClick={(e) => e.stopPropagation()} className="hidden" />
+        <input type="file" accept="image/*" multiple onChange={handleFileInput} className="hidden" />
         <div className="flex flex-col items-center gap-3">
           <div className="w-14 h-14 rounded-full bg-yellow-500/10 flex items-center justify-center">
             <Layers className="w-7 h-7 text-yellow-400" />
@@ -178,7 +176,7 @@ export default function BulkUploadClient() {
             <p className="text-zinc-500 text-sm mt-1">Mehrere Dateien gleichzeitig auswählen — bis zu 100 Bilder</p>
           </div>
         </div>
-      </div>
+      </label>
 
       {items.length > 0 && (
         <>
