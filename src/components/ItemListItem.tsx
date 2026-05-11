@@ -34,6 +34,7 @@ export default function ItemListItem({ item, selected, onToggle }: Props) {
       setFieldValues({
         name: item.name,
         zustand: item.zustand ?? '',
+        serie: item.serie ?? '',
         wert: item.wert ?? '',
         kaufpreis: item.kaufpreis ?? '',
       })
