@@ -33,7 +33,7 @@ async function getItems(search?: string, serie?: string): Promise<Item[]> {
   if (serie) { conditions.push('serie = ?'); args.push(serie) }
   if (search) { conditions.push('name LIKE ?'); args.push(`%${search}%`) }
   if (conditions.length) sql += ' WHERE ' + conditions.join(' AND ')
-  sql += ' ORDER BY name'
+  sql += ' ORDER BY serie ASC, name ASC'
 
   const { rows } = await db.execute({ sql, args })
   return rows.map((r) => parseItem(r as Record<string, unknown>))
