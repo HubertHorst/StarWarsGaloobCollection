@@ -48,8 +48,8 @@ export async function POST(req: NextRequest) {
     const id = randomUUID()
 
     await db.execute({
-      sql: `INSERT INTO items (id, name, serie, set_nummer, jahr, zustand, wert, kaufpreis, lieferung_ausstehend, cover_url, user_photos)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      sql: `INSERT INTO items (id, name, serie, set_nummer, jahr, zustand, wert, kaufpreis, in_sammlung, lieferung_ausstehend, cover_url, user_photos)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
         id,
         body.name.trim(),
@@ -59,6 +59,7 @@ export async function POST(req: NextRequest) {
         body.zustand ?? DEFAULT_CONDITION,
         body.wert ?? getDefaultWert(body.serie ?? null),
         body.kaufpreis ?? null,
+        body.in_sammlung ?? 1,
         body.lieferung_ausstehend ?? 0,
         body.cover_url ?? null,
         body.user_photos ? JSON.stringify(body.user_photos) : null,

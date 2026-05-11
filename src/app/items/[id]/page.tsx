@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, ChevronLeft, ChevronRight, Calendar, Hash, Truck } from 'lucide-react'
+import { ArrowLeft, ChevronLeft, ChevronRight, Calendar, Hash, Truck, PackageCheck } from 'lucide-react'
 import { getDb } from '@/lib/db'
 import { safeParseJson } from '@/lib/validate'
 import { Item } from '@/types/item'
@@ -15,6 +15,7 @@ import RefreshFromImageButton from '@/components/RefreshFromImageButton'
 import CoverZoom from '@/components/CoverZoom'
 import PriceCheckButton from '@/components/PriceCheckButton'
 import LieferungToggle from '@/components/LieferungToggle'
+import SammlungToggle from '@/components/SammlungToggle'
 
 async function getNeighbours(currentId: string): Promise<{ prev: string | null; next: string | null }> {
   const db = getDb()
@@ -152,6 +153,18 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ id:
               )}
               <EditableValue itemId={item.id} field="kaufpreis" label="Kaufpreis" initialValue={item.kaufpreis} />
               <EditableValue itemId={item.id} field="wert" label="Wert" initialValue={item.wert} />
+            </div>
+
+            {/* In Sammlung vorhanden */}
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-zinc-900 border border-white/5">
+              <PackageCheck className={`w-5 h-5 ${item.in_sammlung === 0 ? 'text-red-400' : 'text-green-400'}`} />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-white">In Sammlung</p>
+                <p className={`text-xs mt-0.5 ${item.in_sammlung === 0 ? 'text-red-400' : 'text-green-400'}`}>
+                  {item.in_sammlung === 0 ? 'Fehlt in der Sammlung' : 'Vorhanden'}
+                </p>
+              </div>
+              <SammlungToggle itemId={item.id} initialValue={item.in_sammlung ?? 1} />
             </div>
 
             {/* Lieferung ausstehend */}

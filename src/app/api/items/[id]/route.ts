@@ -5,7 +5,7 @@ import { Item } from '@/types/item'
 
 const ALLOWED_FIELDS = new Set([
   'name', 'serie', 'set_nummer', 'jahr', 'zustand',
-  'wert', 'kaufpreis', 'lieferung_ausstehend', 'cover_url', 'user_photos',
+  'wert', 'kaufpreis', 'in_sammlung', 'lieferung_ausstehend', 'cover_url', 'user_photos',
 ])
 
 function safeParseJson<T>(val: unknown): T | null {

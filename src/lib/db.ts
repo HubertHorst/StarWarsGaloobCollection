@@ -59,6 +59,7 @@ export async function initDb() {
       zustand TEXT,
       wert TEXT,
       kaufpreis TEXT,
+      in_sammlung INTEGER DEFAULT 1,
       lieferung_ausstehend INTEGER DEFAULT 0,
       cover_url TEXT,
       user_photos TEXT,

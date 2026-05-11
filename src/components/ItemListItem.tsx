@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Item } from '@/types/item'
-import { Euro, Pencil, Check, X, Loader2, Square, CheckSquare, Truck } from 'lucide-react'
+import { Euro, Pencil, Check, X, Loader2, Square, CheckSquare, Truck, PackageCheck, PackageMinus } from 'lucide-react'
 import RefreshFromImageButton from '@/components/RefreshFromImageButton'
 import CoverZoom from '@/components/CoverZoom'
 import { CONDITION_PRESETS } from '@/lib/conditionPresets'
@@ -115,6 +115,17 @@ export default function ItemListItem({ item, selected, onToggle }: Props) {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ lieferung_ausstehend: newVal }),
+    })
+    router.refresh()
+  }
+
+  async function toggleSammlung(e: React.MouseEvent) {
+    e.stopPropagation()
+    const newVal = (item.in_sammlung ?? 1) === 1 ? 0 : 1
+    await fetch(`/api/items/${item.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ in_sammlung: newVal }),
     })
     router.refresh()
   }
@@ -290,7 +301,24 @@ export default function ItemListItem({ item, selected, onToggle }: Props) {
         </button>
       </div>
 
-      {/* Col 9 – Refresh button (w-8, sm+) */}
+      {/* Col 9 – In Sammlung (w-8, sm+) */}
+      <div className="hidden sm:flex w-8 flex-shrink-0 items-center justify-center">
+        <button
+          onClick={toggleSammlung}
+          title={item.in_sammlung === 0 ? 'Fehlt in Sammlung' : 'In Sammlung vorhanden'}
+          className={`p-1 rounded-md transition-colors ${
+            item.in_sammlung === 0
+              ? 'text-red-400 bg-red-500/10 hover:bg-red-500/20'
+              : 'text-green-500 bg-green-500/10 hover:bg-green-500/20'
+          }`}
+        >
+          {item.in_sammlung === 0
+            ? <PackageMinus className="w-3.5 h-3.5" />
+            : <PackageCheck className="w-3.5 h-3.5" />}
+        </button>
+      </div>
+
+      {/* Col 10 – Refresh button (w-8, sm+) */}
       <div className="hidden sm:flex w-8 flex-shrink-0 items-center">
         <RefreshFromImageButton itemId={item.id} compact />
       </div>
