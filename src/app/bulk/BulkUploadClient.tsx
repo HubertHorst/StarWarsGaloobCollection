@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { Upload, CheckCircle2, XCircle, Loader2, AlertCircle, Layers } from 'lucide-react'
@@ -41,6 +41,7 @@ function statusColor(status: ItemStatus): string {
 }
 
 export default function BulkUploadClient() {
+  const inputRef = useRef<HTMLInputElement>(null)
   const [items, setItems] = useState<BulkItem[]>([])
   const [running, setRunning] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
@@ -158,16 +159,24 @@ export default function BulkUploadClient() {
       </div>
 
       {/* Drop zone */}
-      <label
+      <div
         onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
         onDragLeave={() => setIsDragging(false)}
         onDrop={handleDrop}
-        className={`block border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-all ${
+        className={`relative border-2 border-dashed rounded-2xl p-10 text-center transition-all ${
           isDragging ? 'border-yellow-500 bg-yellow-500/10' : 'border-zinc-700 hover:border-zinc-500 hover:bg-zinc-800/50'
         }`}
       >
-        <input type="file" accept="image/*" multiple onChange={handleFileInput} className="hidden" />
-        <div className="flex flex-col items-center gap-3">
+        {/* Transparent input covers entire drop zone — most reliable cross-browser approach */}
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          onChange={handleFileInput}
+          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+        />
+        <div className="flex flex-col items-center gap-3 pointer-events-none">
           <div className="w-14 h-14 rounded-full bg-yellow-500/10 flex items-center justify-center">
             <Layers className="w-7 h-7 text-yellow-400" />
           </div>
@@ -176,7 +185,7 @@ export default function BulkUploadClient() {
             <p className="text-zinc-500 text-sm mt-1">Mehrere Dateien gleichzeitig auswählen — bis zu 100 Bilder</p>
           </div>
         </div>
-      </label>
+      </div>
 
       {items.length > 0 && (
         <>
