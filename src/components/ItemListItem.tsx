@@ -172,8 +172,9 @@ export default function ItemListItem({ item, selected, onToggle }: Props) {
         )}
       </div>
 
-      {/* Col 3 – Name (flex-1) */}
+      {/* Col 3 – Name + Serie (flex-1) */}
       <div className="flex-1 min-w-0">
+        {/* Name */}
         {editing === 'name' ? (
           <span className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
             <input
@@ -195,6 +196,39 @@ export default function ItemListItem({ item, selected, onToggle }: Props) {
               onClick={(e) => startEdit('name', e)}
               className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
             >
+              <Pencil className="w-3 h-3 text-zinc-600 hover:text-zinc-400" />
+            </button>
+          </span>
+        )}
+
+        {/* Serie – always full text, no truncation */}
+        {editing === 'serie' ? (
+          <span className="flex flex-col gap-1 mt-0.5" onClick={(e) => e.stopPropagation()}>
+            <select
+              value={fieldValues.serie}
+              onChange={(e) => setFieldValues((v) => ({ ...v, serie: e.target.value }))}
+              className="w-full bg-zinc-800 text-zinc-300 rounded px-1.5 py-0.5 text-xs outline-none ring-2 ring-yellow-500 cursor-pointer"
+            >
+              <option value="">— wählen —</option>
+              {SERIES_PRESETS.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+            <span className="flex items-center gap-1">
+              <button onClick={(e) => save('serie', e)} disabled={saving} className="p-0.5 rounded bg-yellow-600 hover:bg-yellow-500 text-white">
+                {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+              </button>
+              <button onClick={cancel} disabled={saving} className="p-0.5 rounded bg-zinc-700 hover:bg-zinc-600 text-white">
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          </span>
+        ) : (
+          <span className="flex items-center gap-1 mt-0.5 group/serie">
+            <span className="text-xs text-yellow-600/70 group-hover:text-yellow-500/80 transition-colors">
+              {item.serie ?? '—'}
+            </span>
+            <button onClick={(e) => startEdit('serie', e)} className="flex-shrink-0 opacity-0 group-hover/serie:opacity-100 transition-opacity">
               <Pencil className="w-3 h-3 text-zinc-600 hover:text-zinc-400" />
             </button>
           </span>
@@ -243,50 +277,17 @@ export default function ItemListItem({ item, selected, onToggle }: Props) {
         )}
       </div>
 
-      {/* Col 5 – Serie (w-28, sm+) */}
-      <div className="hidden sm:block w-28 flex-shrink-0">
-        {editing === 'serie' ? (
-          <span className="flex flex-col gap-1" onClick={(e) => e.stopPropagation()}>
-            <select
-              value={fieldValues.serie}
-              onChange={(e) => setFieldValues((v) => ({ ...v, serie: e.target.value }))}
-              className="w-full bg-zinc-800 text-zinc-300 rounded px-1.5 py-0.5 text-xs outline-none ring-2 ring-yellow-500 cursor-pointer"
-            >
-              <option value="">— wählen —</option>
-              {SERIES_PRESETS.map((s) => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
-            <span className="flex items-center gap-1">
-              <button onClick={(e) => save('serie', e)} disabled={saving} className="p-0.5 rounded bg-yellow-600 hover:bg-yellow-500 text-white">
-                {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
-              </button>
-              <button onClick={cancel} disabled={saving} className="p-0.5 rounded bg-zinc-700 hover:bg-zinc-600 text-white">
-                <X className="w-3 h-3" />
-              </button>
-            </span>
-          </span>
-        ) : (
-          <span className="flex items-center gap-1 justify-end group/serie">
-            <span className="text-xs text-zinc-500 truncate">{item.serie ?? '—'}</span>
-            <button onClick={(e) => startEdit('serie', e)} className="flex-shrink-0 opacity-0 group-hover/serie:opacity-100 transition-opacity">
-              <Pencil className="w-3 h-3 text-zinc-600 hover:text-zinc-400" />
-            </button>
-          </span>
-        )}
-      </div>
-
-      {/* Col 6 – Jahr (w-12, sm+) */}
+      {/* Col 5 – Jahr (w-12, sm+) */}
       <div className="hidden sm:block w-12 flex-shrink-0 text-xs text-zinc-500 text-right">
         {item.jahr ?? ''}
       </div>
 
-      {/* Col 7 – Set Nr (w-16, md+) */}
+      {/* Col 6 – Set Nr (w-16, md+) */}
       <div className="hidden md:block w-16 flex-shrink-0 text-xs text-zinc-500 text-right truncate">
         {item.set_nummer ?? ''}
       </div>
 
-      {/* Col 8 – Lieferung (w-10, sm+) */}
+      {/* Col 7 – Lieferung (w-10, sm+) */}
       <div className="hidden sm:flex w-10 flex-shrink-0 items-center justify-center">
         <button
           onClick={toggleLieferung}
@@ -301,7 +302,7 @@ export default function ItemListItem({ item, selected, onToggle }: Props) {
         </button>
       </div>
 
-      {/* Col 9 – In Sammlung (w-8, sm+) */}
+      {/* Col 8 – In Sammlung (w-8, sm+) */}
       <div className="hidden sm:flex w-8 flex-shrink-0 items-center justify-center">
         <button
           onClick={toggleSammlung}
@@ -318,7 +319,7 @@ export default function ItemListItem({ item, selected, onToggle }: Props) {
         </button>
       </div>
 
-      {/* Col 10 – Refresh button (w-8, sm+) */}
+      {/* Col 9 – Refresh button (w-8, sm+) */}
       <div className="hidden sm:flex w-8 flex-shrink-0 items-center">
         <RefreshFromImageButton itemId={item.id} compact />
       </div>

@@ -116,9 +116,8 @@ export default function ItemListView({ items }: Props) {
           Columns mirror ItemListItem: gap-3, same widths, same breakpoints
           w-5  checkbox
           w-10 thumbnail
-          flex-1 name
+          flex-1 name + serie (subtitle)
           auto zustand   (sm+)
-          w-28 serie     (sm+)
           w-12 jahr      (sm+)
           w-16 set_nummer (md+)
           w-10 lieferung  (sm+)
@@ -138,13 +137,10 @@ export default function ItemListView({ items }: Props) {
           </div>
           <div className="w-10 flex-shrink-0" />
           <button className={`flex-1 min-w-0 ${headerBtn}`} onClick={() => toggleSort('name')}>
-            Name <SortIcon field="name" />
+            Name / Serie <SortIcon field="name" />
           </button>
           <button className={`flex-shrink-0 ${headerBtn}`} onClick={() => toggleSort('zustand')}>
             Zustand <SortIcon field="zustand" />
-          </button>
-          <button className={`w-28 flex-shrink-0 text-right justify-end ${headerBtn}`} onClick={() => toggleSort('serie')}>
-            Serie <SortIcon field="serie" />
           </button>
           <button className={`w-12 flex-shrink-0 text-right justify-end ${headerBtn}`} onClick={() => toggleSort('jahr')}>
             Jahr <SortIcon field="jahr" />
@@ -171,12 +167,22 @@ export default function ItemListView({ items }: Props) {
         <div className="hidden sm:flex items-center gap-3 px-4 pb-2">
           <div className="w-5 flex-shrink-0" />
           <div className="w-10 flex-shrink-0" />
-          <input
-            value={filters.name}
-            onChange={(e) => setFilters((f) => ({ ...f, name: e.target.value }))}
-            placeholder="Name suchen…"
-            className={`flex-1 min-w-0 ${filterInput}`}
-          />
+          <div className="flex-1 min-w-0 flex gap-1.5">
+            <input
+              value={filters.name}
+              onChange={(e) => setFilters((f) => ({ ...f, name: e.target.value }))}
+              placeholder="Name suchen…"
+              className={`flex-1 min-w-0 ${filterInput}`}
+            />
+            <select
+              value={filters.serie}
+              onChange={(e) => setFilters((f) => ({ ...f, serie: e.target.value }))}
+              className={`w-auto flex-shrink-0 ${filterSelect}`}
+            >
+              <option value="">Alle Serien</option>
+              {series.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
           <select
             value={filters.zustand}
             onChange={(e) => setFilters((f) => ({ ...f, zustand: e.target.value }))}
@@ -186,14 +192,6 @@ export default function ItemListView({ items }: Props) {
             {CONDITION_PRESETS.map((p) => (
               <option key={p} value={p}>{p}</option>
             ))}
-          </select>
-          <select
-            value={filters.serie}
-            onChange={(e) => setFilters((f) => ({ ...f, serie: e.target.value }))}
-            className={`w-28 flex-shrink-0 ${filterSelect}`}
-          >
-            <option value="">Alle</option>
-            {series.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
           <input
             value={filters.jahr}
