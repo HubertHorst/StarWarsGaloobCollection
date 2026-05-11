@@ -6,10 +6,11 @@ import Image from 'next/image'
 import { Item } from '@/types/item'
 import ItemCard from '@/components/ItemCard'
 import BulkActionBar from '@/components/BulkActionBar'
-import { Loader2, Merge, CheckSquare, Square, ChevronUp, ChevronDown, X } from 'lucide-react'
+import { Loader2, Merge, CheckSquare, Square, ChevronUp, ChevronDown, X, ImagePlus } from 'lucide-react'
 import { CONDITION_PRESETS } from '@/lib/conditionPresets'
 import { SERIES_PRESETS } from '@/lib/seriesPresets'
 import { compareNames } from '@/lib/sortItems'
+import CoverSearchModal, { CoverSearchItem } from '@/components/CoverSearchModal'
 
 interface Props {
   items: Item[]
@@ -52,6 +53,8 @@ export default function ItemGridView({ items: initialItems, editMode = false }: 
   const router = useRouter()
 
   const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [coverSearchItems, setCoverSearchItems] = useState<CoverSearchItem[] | null>(null)
+  const [coverOverrides, setCoverOverrides] = useState<Record<string, string>>({})
   const [dragItems, setDragItems] = useState<Item[]>(initialItems)
   useEffect(() => { setDragItems(initialItems) }, [initialItems])
   const [dragId, setDragId] = useState<string | null>(null)
@@ -143,6 +146,24 @@ export default function ItemGridView({ items: initialItems, editMode = false }: 
     setDragItems((prev) => prev.filter((i) => i.id !== pending.source.id))
     setSelectedIds((prev) => prev.filter((id) => id !== pending.source.id))
     setPending(null)
+    router.refresh()
+  }
+
+  function openCoverSearch(ids: string[]) {
+    const searchItems = ids
+      .map((id) => initialItems.find((i) => i.id === id))
+      .filter(Boolean)
+      .map((i) => ({ id: i!.id, name: i!.name, serie: i!.serie }))
+    if (searchItems.length > 0) setCoverSearchItems(searchItems)
+  }
+
+  function handleCoverApplied(itemId: string, newUrl: string) {
+    setCoverOverrides((prev) => ({ ...prev, [itemId]: newUrl }))
+  }
+
+  function handleCoverModalClose() {
+    setCoverSearchItems(null)
+    // Refresh server data to persist overrides across navigation
     router.refresh()
   }
 
@@ -247,7 +268,7 @@ export default function ItemGridView({ items: initialItems, editMode = false }: 
       {toolbar}
 
       {/* Select-all bar */}
-      <div className="flex items-center gap-2 mb-2 text-sm text-zinc-400">
+      <div className="flex flex-wrap items-center gap-2 mb-2 text-sm text-zinc-400">
         <button
           onClick={() => allSelected
             ? setSelectedIds((prev) => prev.filter((id) => !filtered.some((i) => i.id === id)))
@@ -261,12 +282,24 @@ export default function ItemGridView({ items: initialItems, editMode = false }: 
           Alle auswählen
         </button>
         <span className="text-zinc-600">·</span>
-        <span className="text-xs text-zinc-500">Artikel auf einen anderen ziehen zum Zusammenführen</span>
+        <span className="text-xs text-zinc-500 hidden sm:inline">Ziehen zum Zusammenführen</span>
+        {selectedIds.length > 0 && (
+          <>
+            <span className="text-zinc-600 hidden sm:inline">·</span>
+            <button
+              onClick={() => openCoverSearch(selectedIds)}
+              className="flex items-center gap-1.5 text-xs text-yellow-400 hover:text-yellow-300 bg-yellow-500/10 hover:bg-yellow-500/20 px-2.5 py-1 rounded-lg transition-colors"
+            >
+              <ImagePlus className="w-3.5 h-3.5" />
+              Titelbilder suchen ({selectedIds.length})
+            </button>
+          </>
+        )}
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
         {filtered.map((item) => {
-          const cover = coverSrc(item)
+          const cover = coverOverrides[item.id] ?? coverSrc(item)
           const isDragging = dragId === item.id
           const isOver = overId === item.id && dragId !== item.id
           const isSelected = selectedIds.includes(item.id)
@@ -288,7 +321,7 @@ export default function ItemGridView({ items: initialItems, editMode = false }: 
                 setDragId(null)
               }}
               className={[
-                'relative rounded-xl overflow-hidden cursor-grab active:cursor-grabbing transition-all duration-150 select-none',
+                'group relative rounded-xl overflow-hidden cursor-grab active:cursor-grabbing transition-all duration-150 select-none',
                 isDragging ? 'opacity-40 scale-95' : 'opacity-100',
                 isOver     ? 'ring-4 ring-yellow-500 scale-105 shadow-xl shadow-yellow-500/30'
                 : isSelected ? 'ring-2 ring-indigo-400'
@@ -297,12 +330,21 @@ export default function ItemGridView({ items: initialItems, editMode = false }: 
             >
               {/* Checkbox */}
               <button
-                onClick={() => toggleSelect(item.id)}
+                onClick={(e) => { e.stopPropagation(); toggleSelect(item.id) }}
                 className={`absolute top-2 left-2 z-10 w-5 h-5 rounded flex items-center justify-center transition-all ${
                   isSelected ? 'bg-indigo-600 ring-2 ring-indigo-400' : 'bg-zinc-900/70 ring-1 ring-white/20'
                 }`}
               >
                 {isSelected && <CheckSquare className="w-3 h-3 text-white" />}
+              </button>
+
+              {/* Cover search button */}
+              <button
+                onClick={(e) => { e.stopPropagation(); openCoverSearch([item.id]) }}
+                title="Online nach Titelbild suchen"
+                className="absolute top-2 right-2 z-10 w-6 h-6 rounded-lg bg-zinc-900/80 ring-1 ring-white/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-yellow-600 hover:ring-yellow-500"
+              >
+                <ImagePlus className="w-3.5 h-3.5 text-zinc-300" />
               </button>
 
               <div className="aspect-[3/4] bg-zinc-800 relative">
@@ -333,6 +375,15 @@ export default function ItemGridView({ items: initialItems, editMode = false }: 
       )}
 
       <BulkActionBar selectedIds={selectedIds} onClear={() => setSelectedIds([])} items={dragItems} />
+
+      {/* Cover search modal */}
+      {coverSearchItems && (
+        <CoverSearchModal
+          items={coverSearchItems}
+          onApplied={handleCoverApplied}
+          onClose={handleCoverModalClose}
+        />
+      )}
 
       {/* Merge confirmation dialog */}
       {pending && (
