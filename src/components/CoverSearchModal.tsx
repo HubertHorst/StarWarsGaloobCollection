@@ -59,18 +59,14 @@ export default function CoverSearchModal({ items, onClose, onApplied }: Props) {
     setSelected(null)
     setSearchError(null)
     try {
-      const res = await fetch(`/api/cover-search?q=${encodeURIComponent(q.trim())}&debug=1`)
+      const res = await fetch(`/api/cover-search?q=${encodeURIComponent(q.trim())}`)
       const data = await res.json()
       const urls: string[] = data.urls ?? []
       setResults(urls)
       if (data.error) {
-        setSearchError(`API: ${data.error}`)
+        setSearchError(`Suche fehlgeschlagen: ${data.error}`)
       } else if (urls.length === 0) {
-        // Show full debug info so we can diagnose server-side
-        const d = data.debug ?? {}
-        setSearchError(
-          `status:${d.status} bodyLen:${d.bodyLen} hits:${d.rawHits ?? 0} results:${d.resultCount ?? 0}${d.error ? ' ERR:' + d.error : ''}`
-        )
+        setSearchError('Keine Bilder gefunden – Suchbegriff anpassen und erneut suchen.')
       }
     } catch (e) {
       setSearchError(`Fetch failed: ${e}`)

@@ -1,16 +1,23 @@
 import { Item } from '@/types/item'
 
 /**
- * Extract the number after '#' in a name, e.g. "Battle Packs #12" → 12.
- * Also handles plain leading numbers like "12 – Cantina" → 12.
+ * Extract the series number from a name so items sort numerically.
+ *
+ * Patterns handled (in priority order):
+ *  "#N"  anywhere  → "Battle Pack #12"      → 12
+ *  "N –" at start  → "12 – Cantina"         → 12
+ *  " N"  at end    → "Original 3 Pack 10"   → 10
  */
 function leadingNumber(name: string): number | null {
   // "#N" anywhere in the name (Battle Packs, Alpha Series, etc.)
   const hash = name.match(/#\s*(\d+)/)
   if (hash) return parseInt(hash[1], 10)
-  // Plain leading number "N –" or "N –" at the start
+  // Plain leading number "N –" or "N -" at the start
   const plain = name.match(/^(\d+)\s*[–\-]/)
   if (plain) return parseInt(plain[1], 10)
+  // Trailing number " N" at the end (Original 3 Pack, etc.)
+  const trailing = name.match(/\s(\d+)$/)
+  if (trailing) return parseInt(trailing[1], 10)
   return null
 }
 
