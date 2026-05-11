@@ -10,6 +10,7 @@ import ImageGallery from '@/components/ImageGallery'
 import EditableTitle from '@/components/EditableTitle'
 import EditableValue from '@/components/EditableValue'
 import EditableZustand from '@/components/EditableZustand'
+import EditableSerie from '@/components/EditableSerie'
 import RefreshFromImageButton from '@/components/RefreshFromImageButton'
 import CoverZoom from '@/components/CoverZoom'
 import PriceCheckButton from '@/components/PriceCheckButton'
@@ -128,11 +129,9 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ id:
             <div>
               <EditableTitle itemId={item.id} initialName={item.name} />
               <EditableZustand itemId={item.id} initialZustand={item.zustand} />
-              {item.serie && (
-                <span className="inline-block mt-2 text-xs font-semibold uppercase tracking-wider text-yellow-400 bg-yellow-500/10 rounded-full px-3 py-1">
-                  {item.serie}
-                </span>
-              )}
+              <div className="mt-2">
+                <EditableSerie itemId={item.id} initialSerie={item.serie} />
+              </div>
               <div className="mt-3">
                 <PriceCheckButton name={item.name} imageUrl={coverUrl} />
               </div>

@@ -7,8 +7,9 @@ import { Euro, Pencil, Check, X, Loader2, Square, CheckSquare, Truck } from 'luc
 import RefreshFromImageButton from '@/components/RefreshFromImageButton'
 import CoverZoom from '@/components/CoverZoom'
 import { CONDITION_PRESETS } from '@/lib/conditionPresets'
+import { SERIES_PRESETS } from '@/lib/seriesPresets'
 
-type EditingField = 'name' | 'zustand' | 'wert' | 'kaufpreis' | null
+type EditingField = 'name' | 'zustand' | 'serie' | 'wert' | 'kaufpreis' | null
 
 interface Props {
   item: Item
@@ -22,6 +23,7 @@ export default function ItemListItem({ item, selected, onToggle }: Props) {
   const [fieldValues, setFieldValues] = useState({
     name: item.name,
     zustand: item.zustand ?? '',
+    serie: item.serie ?? '',
     wert: item.wert ?? '',
     kaufpreis: item.kaufpreis ?? '',
   })
@@ -36,7 +38,7 @@ export default function ItemListItem({ item, selected, onToggle }: Props) {
         kaufpreis: item.kaufpreis ?? '',
       })
     }
-  }, [item.name, item.zustand, item.wert, item.kaufpreis, editing])
+  }, [item.name, item.zustand, item.serie, item.wert, item.kaufpreis, editing])
 
   const inputRef = useRef<HTMLInputElement>(null)
   useEffect(() => {
@@ -57,6 +59,7 @@ export default function ItemListItem({ item, selected, onToggle }: Props) {
     setFieldValues({
       name: item.name,
       zustand: item.zustand ?? '',
+      serie: item.serie ?? '',
       wert: item.wert ?? '',
       kaufpreis: item.kaufpreis ?? '',
     })
@@ -71,6 +74,7 @@ export default function ItemListItem({ item, selected, onToggle }: Props) {
     const val = fieldValues[field].trim()
     const original = field === 'name' ? item.name
       : field === 'zustand' ? (item.zustand ?? '')
+      : field === 'serie' ? (item.serie ?? '')
       : field === 'wert' ? (item.wert ?? '')
       : (item.kaufpreis ?? '')
 
@@ -228,8 +232,36 @@ export default function ItemListItem({ item, selected, onToggle }: Props) {
       </div>
 
       {/* Col 5 – Serie (w-28, sm+) */}
-      <div className="hidden sm:block w-28 flex-shrink-0 text-xs text-zinc-500 text-right truncate">
-        {item.serie ?? ''}
+      <div className="hidden sm:block w-28 flex-shrink-0">
+        {editing === 'serie' ? (
+          <span className="flex flex-col gap-1" onClick={(e) => e.stopPropagation()}>
+            <select
+              value={fieldValues.serie}
+              onChange={(e) => setFieldValues((v) => ({ ...v, serie: e.target.value }))}
+              className="w-full bg-zinc-800 text-zinc-300 rounded px-1.5 py-0.5 text-xs outline-none ring-2 ring-yellow-500 cursor-pointer"
+            >
+              <option value="">— wählen —</option>
+              {SERIES_PRESETS.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+            <span className="flex items-center gap-1">
+              <button onClick={(e) => save('serie', e)} disabled={saving} className="p-0.5 rounded bg-yellow-600 hover:bg-yellow-500 text-white">
+                {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+              </button>
+              <button onClick={cancel} disabled={saving} className="p-0.5 rounded bg-zinc-700 hover:bg-zinc-600 text-white">
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          </span>
+        ) : (
+          <span className="flex items-center gap-1 justify-end group/serie">
+            <span className="text-xs text-zinc-500 truncate">{item.serie ?? '—'}</span>
+            <button onClick={(e) => startEdit('serie', e)} className="flex-shrink-0 opacity-0 group-hover/serie:opacity-100 transition-opacity">
+              <Pencil className="w-3 h-3 text-zinc-600 hover:text-zinc-400" />
+            </button>
+          </span>
+        )}
       </div>
 
       {/* Col 6 – Jahr (w-12, sm+) */}
