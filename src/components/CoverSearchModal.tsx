@@ -20,6 +20,11 @@ function buildDefaultQuery(item: CoverSearchItem) {
   return [item.name, item.serie, 'Star Wars Galoob'].filter(Boolean).join(' ')
 }
 
+/** Proxy all preview images through our server to bypass hotlink protection */
+function proxyUrl(url: string) {
+  return `/api/proxy-image?url=${encodeURIComponent(url)}`
+}
+
 export default function CoverSearchModal({ items, onClose, onApplied }: Props) {
   const [queueIndex, setQueueIndex] = useState(0)
   const [queryInput, setQueryInput] = useState('')
@@ -183,7 +188,7 @@ export default function CoverSearchModal({ items, onClose, onApplied }: Props) {
                     ].join(' ')}
                   >
                     <img
-                      src={url}
+                      src={proxyUrl(url)}
                       alt={`Option ${i + 1}`}
                       className="w-full h-full object-cover"
                       onError={() => setBrokenUrls((s) => new Set([...s, url]))}
