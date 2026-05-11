@@ -100,7 +100,10 @@ export default function ItemGridView({ items: initialItems, editMode = false }: 
         const dir = sort.dir === 'asc' ? 1 : -1
         switch (sort.field) {
           case 'name':                 return dir * compareNames(a.name, b.name)
-          case 'serie':                return dir * (a.serie ?? '').localeCompare(b.serie ?? '')
+          case 'serie': {
+            const s = (a.serie ?? '').localeCompare(b.serie ?? '')
+            return s !== 0 ? dir * s : compareNames(a.name, b.name)
+          }
           case 'jahr':                 return dir * ((a.jahr ?? 0) - (b.jahr ?? 0))
           case 'wert':                 return dir * (parseValue(a.wert) - parseValue(b.wert))
           case 'kaufpreis':            return dir * (parseValue(a.kaufpreis) - parseValue(b.kaufpreis))

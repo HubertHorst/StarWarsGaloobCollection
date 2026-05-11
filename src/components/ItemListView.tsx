@@ -52,7 +52,10 @@ export default function ItemListView({ items }: Props) {
         switch (sort.field) {
           case 'name':      return dir * compareNames(a.name, b.name)
           case 'zustand':   return dir * (a.zustand ?? '').localeCompare(b.zustand ?? '')
-          case 'serie':     return dir * (a.serie ?? '').localeCompare(b.serie ?? '')
+          case 'serie': {
+            const s = (a.serie ?? '').localeCompare(b.serie ?? '')
+            return s !== 0 ? dir * s : compareNames(a.name, b.name)
+          }
           case 'jahr':      return dir * ((a.jahr ?? 0) - (b.jahr ?? 0))
           case 'set_nummer':return dir * (a.set_nummer ?? '').localeCompare(b.set_nummer ?? '')
           case 'kaufpreis':           return dir * (parseValue(a.kaufpreis) - parseValue(b.kaufpreis))

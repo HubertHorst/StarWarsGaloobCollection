@@ -35,7 +35,18 @@ async function getItems(search?: string, serie?: string): Promise<Item[]> {
   if (search) { conditions.push('name LIKE ?'); args.push(`%${search}%`) }
   if (conditions.length) sql += ' WHERE ' + conditions.join(' AND ')
 
+  // Sort: serie alpha, then numeric for #N names, then plain alpha
+  sql += ` ORDER BY serie ASC,
+    CASE
+      WHEN INSTR(name, '#') > 0
+        THEN PRINTF('%08d', CAST(TRIM(SUBSTR(name, INSTR(name, '#') + 1)) AS INTEGER))
+      WHEN name GLOB '[0-9]*'
+        THEN PRINTF('%08d', CAST(name AS INTEGER))
+      ELSE 'zzzzzzzz' || LOWER(name)
+    END ASC`
+
   const { rows } = await db.execute({ sql, args })
+  // JS sort as secondary safety net (handles edge-cases SQL misses)
   return sortItems(rows.map((r) => parseItem(r as Record<string, unknown>)))
 }
 
