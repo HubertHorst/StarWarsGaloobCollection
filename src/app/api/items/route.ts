@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getDb } from '@/lib/db'
+import { getDbReady } from '@/lib/db'
 import { safeParseJson } from '@/lib/validate'
 import { Item } from '@/types/item'
 import { randomUUID } from 'crypto'
@@ -13,7 +13,7 @@ function parseItem(row: Record<string, unknown>): Item {
 
 export async function GET(req: NextRequest) {
   try {
-    const db = getDb()
+    const db = await getDbReady()
     const serie = req.nextUrl.searchParams.get('serie')
     const search = req.nextUrl.searchParams.get('q')
 
@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const db = getDb()
+    const db = await getDbReady()
     const body = await req.json()
 
     if (!body.name || typeof body.name !== 'string' || !body.name.trim()) {

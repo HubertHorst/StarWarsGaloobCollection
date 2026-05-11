@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
-import { getDb } from '@/lib/db'
+import { getDbReady } from '@/lib/db'
 
 export async function GET() {
   try {
-    const db = getDb()
+    const db = await getDbReady()
     const { rows } = await db.execute(
       `SELECT id, item_id, item_name, action, fields, created_at
        FROM changelog ORDER BY id DESC LIMIT 30`

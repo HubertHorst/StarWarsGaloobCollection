@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
-import { getDb, logChange } from '@/lib/db'
+import { getDbReady, logChange } from '@/lib/db'
 
 export async function POST(req: NextRequest) {
   try {
@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
     const validFields = Object.entries(fields).filter(([k]) => allowed.has(k))
     if (validFields.length === 0) return NextResponse.json({ error: 'No valid fields' }, { status: 400 })
 
-    const db = getDb()
+    const db = await getDbReady()
     const setClauses = validFields.map(([k]) => `${k} = ?`).join(', ')
     const fieldValues = validFields.map(([, v]) => v)
 

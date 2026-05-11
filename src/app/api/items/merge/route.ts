@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getDb } from '@/lib/db'
+import { getDbReady } from '@/lib/db'
 import { safeParseJson } from '@/lib/validate'
 
 export async function POST(req: NextRequest) {
@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid ids' }, { status: 400 })
     }
 
-    const db = getDb()
+    const db = await getDbReady()
     const { rows } = await db.execute({
       sql: 'SELECT * FROM items WHERE id IN (?, ?)',
       args: [sourceId, targetId],

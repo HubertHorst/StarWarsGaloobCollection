@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
-import { getDb, logChange } from '@/lib/db'
+import { getDbReady, logChange } from '@/lib/db'
 import { Item } from '@/types/item'
 
 const ALLOWED_FIELDS = new Set([
@@ -22,7 +22,7 @@ function parseItem(row: Record<string, unknown>): Item {
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const db = getDb()
+    const db = await getDbReady()
     const { id } = await params
     const { rows } = await db.execute({ sql: 'SELECT * FROM items WHERE id = ?', args: [id] })
     if (!rows[0]) return NextResponse.json({ error: 'Not found' }, { status: 404 })
@@ -35,7 +35,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const db = getDb()
+    const db = await getDbReady()
     const { id } = await params
     const body = await req.json()
 
@@ -71,7 +71,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const db = getDb()
+    const db = await getDbReady()
     const { id } = await params
     await db.execute({ sql: 'DELETE FROM items WHERE id = ?', args: [id] })
     return new NextResponse(null, { status: 204 })

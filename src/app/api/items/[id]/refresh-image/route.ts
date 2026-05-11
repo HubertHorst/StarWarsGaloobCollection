@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import Anthropic from '@anthropic-ai/sdk'
-import { getDb, logChange } from '@/lib/db'
+import { getDbReady, logChange } from '@/lib/db'
 import { safeParseJson } from '@/lib/validate'
 
 const anthropic = new Anthropic()
@@ -14,7 +14,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const preview = new URL(req.url).searchParams.get('preview') === '1'
   try {
     const { id } = await params
-    const db = getDb()
+    const db = await getDbReady()
 
     // load item
     const { rows } = await db.execute({ sql: 'SELECT * FROM items WHERE id = ?', args: [id] })

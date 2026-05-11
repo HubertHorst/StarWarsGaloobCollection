@@ -1,6 +1,7 @@
 import { createClient } from '@libsql/client'
 
 let _client: ReturnType<typeof createClient> | null = null
+let _initialized: Promise<void> | null = null
 
 export function getDb() {
   if (!_client) {
@@ -10,6 +11,15 @@ export function getDb() {
     })
   }
   return _client
+}
+
+export async function getDbReady() {
+  const db = getDb()
+  if (!_initialized) {
+    _initialized = initDb()
+  }
+  await _initialized
+  return db
 }
 
 export async function logChange(

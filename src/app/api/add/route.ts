@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getDb } from '@/lib/db'
+import { getDbReady } from '@/lib/db'
 import { randomUUID } from 'crypto'
 
 export async function POST(req: NextRequest) {
   try {
-    const db = getDb()
+    const db = await getDbReady()
     const body = await req.json()
 
     if (!body.name || typeof body.name !== 'string' || !body.name.trim()) {
