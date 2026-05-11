@@ -135,8 +135,8 @@ export default function ItemGridView({ items: initialItems, editMode = false }: 
 
               <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/90 to-transparent p-2">
                 <p className="text-white text-xs font-medium leading-tight line-clamp-2">{item.name}</p>
-                {item.zustand && (
-                  <p className="text-yellow-400 text-xs mt-0.5 uppercase tracking-wide truncate">{item.zustand}</p>
+                {item.serie && (
+                  <p className="text-yellow-400 text-xs mt-0.5 truncate">{item.serie}</p>
                 )}
               </div>
             </div>

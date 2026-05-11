@@ -62,14 +62,9 @@ export default function ItemCard({ item, selected, onToggle }: Props) {
         )}
 
         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-3">
-          {item.zustand && (
-            <span className="inline-block mb-1 text-xs font-semibold uppercase tracking-wider text-yellow-400 bg-yellow-500/10 rounded-full px-2 py-0.5">
-              {item.zustand}
-            </span>
-          )}
           <p className="text-white text-sm font-semibold leading-tight line-clamp-2">{item.name}</p>
           {item.serie && (
-            <p className="text-zinc-400 text-xs mt-0.5 truncate">{item.serie}</p>
+            <p className="text-yellow-400 text-xs mt-0.5 truncate">{item.serie}</p>
           )}
         </div>
       </div>
