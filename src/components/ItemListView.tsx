@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { ChevronUp, ChevronDown, ChevronsUpDown, CheckSquare, Square } from 'lucide-react'
 import { Item } from '@/types/item'
 import ItemListItem from '@/components/ItemListItem'
@@ -26,6 +26,24 @@ export default function ItemListView({ items }: Props) {
   const [selectedIds, setSelectedIds] = useState<string[]>([])
 
   const series = useMemo(() => [...new Set(items.map((i) => i.serie).filter(Boolean) as string[])].sort(), [items])
+
+  // ── Persist / restore filter + sort state ────────────────────────────────
+  useEffect(() => {
+    try {
+      const f = sessionStorage.getItem('list-filters')
+      if (f) setFilters(JSON.parse(f))
+      const s = sessionStorage.getItem('list-sort')
+      if (s) setSort(JSON.parse(s))
+    } catch { /* ignore */ }
+  }, [])
+
+  useEffect(() => {
+    sessionStorage.setItem('list-filters', JSON.stringify(filters))
+  }, [filters])
+
+  useEffect(() => {
+    sessionStorage.setItem('list-sort', JSON.stringify(sort))
+  }, [sort])
 
   const filtered = useMemo(() => {
     return items
@@ -66,6 +84,11 @@ export default function ItemListView({ items }: Props) {
         }
       })
   }, [items, filters, sort])
+
+  // Write filtered order so ItemNavigation uses it for prev/next in detail view
+  useEffect(() => {
+    sessionStorage.setItem('grid-filtered-ids', JSON.stringify(filtered.map((i) => i.id)))
+  }, [filtered])
 
   function toggleSort(field: SortField) {
     setSort((s) => s.field === field ? { field, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { field, dir: 'asc' })
