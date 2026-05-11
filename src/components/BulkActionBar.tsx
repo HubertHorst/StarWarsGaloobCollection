@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Loader2, Check, X, ScanSearch } from 'lucide-react'
+import { Loader2, Check, X, ScanSearch, Trash2 } from 'lucide-react'
 import { CONDITION_PRESETS } from '@/lib/conditionPresets'
 import BulkRefreshReviewModal, { ProposedData } from '@/components/BulkRefreshReviewModal'
 import { Item } from '@/types/item'
@@ -29,11 +29,26 @@ export default function BulkActionBar({ selectedIds, onClear, items = [] }: Prop
   const [refreshProgress, setRefreshProgress] = useState<{ done: number; total: number } | null>(null)
   const [review, setReview] = useState<ReviewState | null>(null)
   const [applying, setApplying] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   if (selectedIds.length === 0) return null
 
   const effectiveZustand = customZustand.trim() || zustand
-  const busy = saving || refreshing
+  const busy = saving || refreshing || deleting
+
+  async function bulkDelete() {
+    setDeleting(true)
+    await Promise.all(selectedIds.map((id) =>
+      fetch(`/api/items/${id}`, { method: 'DELETE' })
+    ))
+    setDeleting(false)
+    setConfirmDelete(false)
+    onClear()
+    const params = new URLSearchParams(window.location.search)
+    params.delete('edit')
+    router.push(`/?${params.toString()}`, { scroll: false })
+  }
 
   async function apply() {
     if (!effectiveZustand) return
@@ -168,11 +183,52 @@ export default function BulkActionBar({ selectedIds, onClear, items = [] }: Prop
           : <><ScanSearch className="w-4 h-4" />Aus Bild neu laden</>}
       </button>
 
-      {/* Clear */}
+      <div className="w-px h-5 bg-white/10" />
+
+      {/* Bulk delete */}
+      <button
+        onClick={() => setConfirmDelete(true)}
+        disabled={busy}
+        className="flex items-center gap-1.5 bg-red-700 hover:bg-red-600 disabled:opacity-40 text-white text-sm font-medium px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap"
+      >
+        <Trash2 className="w-4 h-4" />
+        Löschen
+      </button>
+
+      {/* Clear selection */}
       <button onClick={onClear} disabled={busy} className="text-zinc-500 hover:text-zinc-300 transition-colors disabled:opacity-40">
         <X className="w-4 h-4" />
       </button>
     </div>
+
+    {/* Delete confirmation dialog */}
+    {confirmDelete && (
+      <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="bg-zinc-900 border border-white/10 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+          <h2 className="text-lg font-bold mb-2">Artikel löschen?</h2>
+          <p className="text-zinc-400 text-sm mb-6">
+            {selectedIds.length} {selectedIds.length === 1 ? 'Artikel wird' : 'Artikel werden'} unwiderruflich gelöscht.
+          </p>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setConfirmDelete(false)}
+              disabled={deleting}
+              className="flex-1 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm transition-colors"
+            >
+              Abbrechen
+            </button>
+            <button
+              onClick={bulkDelete}
+              disabled={deleting}
+              className="flex-1 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white text-sm font-medium transition-colors flex items-center justify-center gap-2"
+            >
+              {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+              Löschen
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
 
     {review && (
       <BulkRefreshReviewModal
