@@ -6,6 +6,7 @@ import Image from 'next/image'
 import { Upload, Camera, CheckCircle2, Loader2, AlertCircle, X, ImagePlus } from 'lucide-react'
 import { compressImage } from '@/lib/compressImage'
 import { CONDITION_PRESETS, DEFAULT_CONDITION } from '@/lib/conditionPresets'
+import { SERIES_PRESETS } from '@/lib/seriesPresets'
 
 type Step = 'upload' | 'identifying' | 'results' | 'saving'
 
@@ -316,7 +317,12 @@ export default function AddItemClient() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={labelClass}>Serie</label>
-              <input type="text" placeholder="z.B. Micro Machines" value={form.serie} onChange={(e) => setField('serie', e.target.value)} className={inputClass} />
+              <select value={form.serie} onChange={(e) => setField('serie', e.target.value)} className={inputClass}>
+                <option value="">— wählen —</option>
+                {SERIES_PRESETS.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label className={labelClass}>Set-Nummer</label>

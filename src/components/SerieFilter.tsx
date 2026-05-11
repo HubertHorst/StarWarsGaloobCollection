@@ -2,17 +2,15 @@
 
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Filter } from 'lucide-react'
+import { SERIES_PRESETS } from '@/lib/seriesPresets'
 
 interface Props {
-  series: string[]
   selected?: string
 }
 
-export default function SerieFilter({ series, selected }: Props) {
+export default function SerieFilter({ selected }: Props) {
   const router = useRouter()
   const searchParams = useSearchParams()
-
-  if (series.length === 0) return null
 
   function handleChange(value: string) {
     const params = new URLSearchParams(searchParams.toString())
@@ -33,7 +31,7 @@ export default function SerieFilter({ series, selected }: Props) {
         className="appearance-none bg-zinc-800/80 border border-white/10 rounded-lg pl-9 pr-8 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-yellow-500/50 focus:border-yellow-500/50 transition-all cursor-pointer"
       >
         <option value="">Alle Serien</option>
-        {series.map((s) => (
+        {SERIES_PRESETS.map((s) => (
           <option key={s} value={s}>{s}</option>
         ))}
       </select>

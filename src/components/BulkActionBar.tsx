@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2, Check, X, ScanSearch, Trash2 } from 'lucide-react'
 import { CONDITION_PRESETS } from '@/lib/conditionPresets'
+import { SERIES_PRESETS } from '@/lib/seriesPresets'
 import BulkRefreshReviewModal, { ProposedData } from '@/components/BulkRefreshReviewModal'
 import { Item } from '@/types/item'
 
@@ -23,7 +24,7 @@ interface ReviewState {
 export default function BulkActionBar({ selectedIds, onClear, items = [] }: Props) {
   const router = useRouter()
   const [zustand, setZustand] = useState('')
-  const [customZustand, setCustomZustand] = useState('')
+  const [serie, setSerie] = useState('')
   const [saving, setSaving] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [refreshProgress, setRefreshProgress] = useState<{ done: number; total: number } | null>(null)
@@ -34,7 +35,6 @@ export default function BulkActionBar({ selectedIds, onClear, items = [] }: Prop
 
   if (selectedIds.length === 0) return null
 
-  const effectiveZustand = customZustand.trim() || zustand
   const busy = saving || refreshing || deleting
 
   async function bulkDelete() {
@@ -51,9 +51,11 @@ export default function BulkActionBar({ selectedIds, onClear, items = [] }: Prop
   }
 
   async function apply() {
-    if (!effectiveZustand) return
+    if (!zustand && !serie) return
     setSaving(true)
-    const fields: Record<string, string | null> = { zustand: effectiveZustand }
+    const fields: Record<string, string | null> = {}
+    if (zustand) fields.zustand = zustand
+    if (serie) fields.serie = serie
     await fetch('/api/items/bulk-patch', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -138,10 +140,23 @@ export default function BulkActionBar({ selectedIds, onClear, items = [] }: Prop
 
       <div className="w-px h-5 bg-white/10" />
 
+      {/* Serie dropdown */}
+      <select
+        value={serie}
+        onChange={(e) => setSerie(e.target.value)}
+        disabled={busy}
+        className="bg-zinc-800 text-zinc-300 text-sm rounded-lg px-2 py-1.5 outline-none ring-1 ring-white/10 focus:ring-yellow-500 cursor-pointer disabled:opacity-40"
+      >
+        <option value="">— Serie wählen —</option>
+        {SERIES_PRESETS.map((s) => (
+          <option key={s} value={s}>{s}</option>
+        ))}
+      </select>
+
       {/* Zustand dropdown */}
       <select
         value={zustand}
-        onChange={(e) => { setZustand(e.target.value); setCustomZustand('') }}
+        onChange={(e) => setZustand(e.target.value)}
         disabled={busy}
         className="bg-zinc-800 text-zinc-300 text-sm rounded-lg px-2 py-1.5 outline-none ring-1 ring-white/10 focus:ring-yellow-500 cursor-pointer disabled:opacity-40"
       >
@@ -151,19 +166,10 @@ export default function BulkActionBar({ selectedIds, onClear, items = [] }: Prop
         ))}
       </select>
 
-      {/* Custom text */}
-      <input
-        value={customZustand}
-        onChange={(e) => setCustomZustand(e.target.value)}
-        placeholder="Eigene…"
-        disabled={busy}
-        className="w-28 bg-zinc-800 text-zinc-300 text-sm rounded-lg px-2 py-1.5 outline-none ring-1 ring-white/10 focus:ring-yellow-500 disabled:opacity-40"
-      />
-
-      {/* Apply zustand */}
+      {/* Apply */}
       <button
         onClick={apply}
-        disabled={busy || !effectiveZustand}
+        disabled={busy || (!zustand && !serie)}
         className="flex items-center gap-1.5 bg-yellow-600 hover:bg-yellow-500 disabled:opacity-40 text-white text-sm font-medium px-3 py-1.5 rounded-lg transition-colors"
       >
         {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}

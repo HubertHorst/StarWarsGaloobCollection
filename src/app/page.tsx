@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { Plus, Layers, Star } from 'lucide-react'
 import EditModeToggle from '@/components/EditModeToggle'
-import { getDb, initDb } from '@/lib/db'
+import { initDb } from '@/lib/db'
 import { safeParseJson } from '@/lib/validate'
 import ItemGridView from '@/components/ItemGridView'
 import ItemListView from '@/components/ItemListView'
@@ -39,17 +39,11 @@ async function getItems(search?: string, serie?: string): Promise<Item[]> {
   return rows.map((r) => parseItem(r as Record<string, unknown>))
 }
 
-async function getSeries(): Promise<string[]> {
-  const db = getDb()
-  const { rows } = await db.execute('SELECT DISTINCT serie FROM items WHERE serie IS NOT NULL ORDER BY serie')
-  return rows.map((r) => r.serie as string)
-}
-
 export default async function LibraryPage({ searchParams }: Props) {
   const { q, serie, view, edit } = await searchParams
   const currentView = view === 'list' ? 'list' : 'grid'
   const editMode = edit === '1' && currentView === 'grid'
-  const [items, series] = await Promise.all([getItems(q, serie), getSeries()])
+  const items = await getItems(q, serie)
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
@@ -89,7 +83,7 @@ export default async function LibraryPage({ searchParams }: Props) {
         <ScrollRestorer />
         <div className="flex flex-col sm:flex-row gap-3">
           <SearchBar defaultValue={q} />
-          <SerieFilter series={series} selected={serie} />
+          <SerieFilter selected={serie} />
           <ViewToggle current={currentView} />
         </div>
 
