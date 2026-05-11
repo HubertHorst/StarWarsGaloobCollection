@@ -3,64 +3,96 @@ import { NextRequest, NextResponse } from 'next/server'
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
 
-/**
- * Two-step DuckDuckGo image search.
- * Step 1: fetch the HTML page to obtain the required `vqd` session token.
- * Step 2: call the i.js JSON endpoint with that token.
- *
- * IMPORTANT: both fetches must use cache: 'no-store'.
- * Next.js App Router caches fetch() responses by default; reusing a cached
- * vqd token for a second request causes DDG to return an error.
- */
-async function searchDDG(q: string): Promise<string[]> {
+async function searchDDG(q: string): Promise<{ urls: string[]; debug: Record<string, unknown> }> {
+  const debug: Record<string, unknown> = {}
+
   // ── Step 1: get vqd token ──────────────────────────────────────────────────
-  const initRes = await fetch(
-    `https://duckduckgo.com/?q=${encodeURIComponent(q)}&iax=images&ia=images`,
-    {
-      cache: 'no-store',
-      headers: { 'User-Agent': UA, 'Accept-Language': 'en-US,en;q=0.9' },
+  const initUrl = `https://duckduckgo.com/?q=${encodeURIComponent(q)}&iax=images&ia=images`
+  const initRes = await fetch(initUrl, {
+    cache: 'no-store',
+    headers: {
+      'User-Agent': UA,
+      'Accept-Language': 'en-US,en;q=0.9',
+      Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
     },
-  )
-  if (!initRes.ok) throw new Error(`DDG init failed: ${initRes.status}`)
+  })
+  debug.initStatus = initRes.status
+  debug.initUrl = initUrl
+
+  if (!initRes.ok) {
+    debug.error = `DDG init HTTP ${initRes.status}`
+    return { urls: [], debug }
+  }
 
   const initBody = await initRes.text()
+  debug.initBodyLen = initBody.length
 
   const m = initBody.match(/vqd=['"]?([\d-]+)['"]?/)
   const vqd = m?.[1]
-  if (!vqd) throw new Error('DDG vqd token not found in response')
+  debug.vqd = vqd ?? null
+
+  if (!vqd) {
+    debug.error = 'vqd token not found'
+    debug.bodySnippet = initBody.substring(0, 400)
+    return { urls: [], debug }
+  }
 
   // ── Step 2: fetch image results ────────────────────────────────────────────
-  const imgRes = await fetch(
+  const imgUrl =
     `https://duckduckgo.com/i.js` +
-      `?q=${encodeURIComponent(q)}&p=1&s=0&u=bing&l=us-en&o=json&vqd=${encodeURIComponent(vqd)}`,
-    {
-      cache: 'no-store',
-      headers: {
-        'User-Agent': UA,
-        Referer: 'https://duckduckgo.com/',
-        'Accept-Language': 'en-US,en;q=0.9',
-      },
-    },
-  )
-  if (!imgRes.ok) throw new Error(`DDG i.js failed: ${imgRes.status}`)
+    `?q=${encodeURIComponent(q)}&p=1&s=0&u=bing&l=us-en&o=json&vqd=${vqd}`
 
-  const data = (await imgRes.json()) as { results?: Array<{ image?: string }> }
-  return (data.results ?? [])
+  const imgRes = await fetch(imgUrl, {
+    cache: 'no-store',
+    headers: {
+      'User-Agent': UA,
+      Referer: 'https://duckduckgo.com/',
+      'Accept-Language': 'en-US,en;q=0.9',
+    },
+  })
+  debug.imgStatus = imgRes.status
+  debug.imgUrl = imgUrl
+
+  if (!imgRes.ok) {
+    debug.error = `DDG i.js HTTP ${imgRes.status}`
+    return { urls: [], debug }
+  }
+
+  const text = await imgRes.text()
+  debug.imgBodyLen = text.length
+  debug.imgBodySnippet = text.substring(0, 200)
+
+  let data: { results?: Array<{ image?: string }> }
+  try {
+    data = JSON.parse(text)
+  } catch (e) {
+    debug.error = `JSON parse failed: ${e}`
+    return { urls: [], debug }
+  }
+
+  debug.resultCount = data.results?.length ?? 0
+
+  const urls = (data.results ?? [])
     .map((r) => r.image)
     .filter((u): u is string => !!u && u.startsWith('http'))
+
+  return { urls, debug }
 }
 
 export async function GET(req: NextRequest) {
   const q = req.nextUrl.searchParams.get('q') ?? ''
+  const isDebug = req.nextUrl.searchParams.get('debug') === '1'
+
   if (!q.trim()) return NextResponse.json({ urls: [] })
 
   try {
-    const urls = await searchDDG(q.trim())
+    const { urls, debug } = await searchDDG(q.trim())
+    if (isDebug) return NextResponse.json({ urls: urls.slice(0, 16), debug })
     return NextResponse.json({ urls: urls.slice(0, 16) })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     console.error('cover-search error:', message)
-    // Return the error so the modal can show it instead of silently showing nothing
+    if (isDebug) return NextResponse.json({ urls: [], error: message })
     return NextResponse.json({ urls: [], error: message })
   }
 }
