@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Calendar, Hash, Truck, PackageCheck } from 'lucide-react'
 import { getDb } from '@/lib/db'
+import { compareNames } from '@/lib/sortItems'
 import { safeParseJson } from '@/lib/validate'
 import { Item } from '@/types/item'
 import UploadPhotoButton from '@/components/UploadPhotoButton'
@@ -21,8 +22,11 @@ import ItemNavigation from '@/components/ItemNavigation'
 async function getNeighbours(currentId: string): Promise<{ prev: string | null; next: string | null }> {
   const db = getDb()
   try {
-    const result = await db.execute('SELECT id FROM items ORDER BY name')
-    const rows = result.rows.map((r) => String(r.id))
+    const result = await db.execute('SELECT id, name FROM items')
+    const rows = result.rows
+      .slice()
+      .sort((a, b) => compareNames(String(a.name ?? ''), String(b.name ?? '')))
+      .map((r) => String(r.id))
     const idx = rows.indexOf(currentId)
     if (idx === -1) return { prev: null, next: null }
     return {

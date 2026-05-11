@@ -6,6 +6,7 @@ import { Item } from '@/types/item'
 import ItemListItem from '@/components/ItemListItem'
 import BulkActionBar from '@/components/BulkActionBar'
 import { CONDITION_PRESETS } from '@/lib/conditionPresets'
+import { compareNames } from '@/lib/sortItems'
 
 interface Props {
   items: Item[]
@@ -49,7 +50,7 @@ export default function ItemListView({ items }: Props) {
       .sort((a, b) => {
         const dir = sort.dir === 'asc' ? 1 : -1
         switch (sort.field) {
-          case 'name':      return dir * a.name.localeCompare(b.name)
+          case 'name':      return dir * compareNames(a.name, b.name)
           case 'zustand':   return dir * (a.zustand ?? '').localeCompare(b.zustand ?? '')
           case 'serie':     return dir * (a.serie ?? '').localeCompare(b.serie ?? '')
           case 'jahr':      return dir * ((a.jahr ?? 0) - (b.jahr ?? 0))

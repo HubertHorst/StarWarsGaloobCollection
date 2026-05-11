@@ -11,6 +11,7 @@ import ViewToggle from '@/components/ViewToggle'
 import ChangelogPanel from '@/components/ChangelogPanel'
 import ScrollRestorer from '@/components/ScrollRestorer'
 import { Item } from '@/types/item'
+import { sortItems } from '@/lib/sortItems'
 
 interface Props {
   searchParams: Promise<{ q?: string; serie?: string; view?: string; edit?: string }>
@@ -33,10 +34,9 @@ async function getItems(search?: string, serie?: string): Promise<Item[]> {
   if (serie) { conditions.push('serie = ?'); args.push(serie) }
   if (search) { conditions.push('name LIKE ?'); args.push(`%${search}%`) }
   if (conditions.length) sql += ' WHERE ' + conditions.join(' AND ')
-  sql += ' ORDER BY serie ASC, name ASC'
 
   const { rows } = await db.execute({ sql, args })
-  return rows.map((r) => parseItem(r as Record<string, unknown>))
+  return sortItems(rows.map((r) => parseItem(r as Record<string, unknown>)))
 }
 
 export default async function LibraryPage({ searchParams }: Props) {
