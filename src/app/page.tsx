@@ -47,7 +47,8 @@ export default async function LibraryPage({ searchParams }: Props) {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
-      <header className="border-b border-white/5 bg-zinc-900/80 backdrop-blur sticky top-0 z-10">
+      <div className="sticky top-0 z-10">
+      <header className="border-b border-white/5 bg-zinc-900/80 backdrop-blur">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <Star className="w-6 h-6 text-yellow-400 fill-yellow-400" />
@@ -78,14 +79,17 @@ export default async function LibraryPage({ searchParams }: Props) {
           </div>
         </div>
       </header>
-
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
-        <ScrollRestorer />
-        <div className="flex flex-col sm:flex-row gap-3">
+      <div className="border-b border-white/5 bg-zinc-900/80 backdrop-blur">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-col sm:flex-row gap-3">
           <SearchBar defaultValue={q} />
           <SerieFilter selected={serie} />
           <ViewToggle current={currentView} />
         </div>
+      </div>
+      </div>
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+        <ScrollRestorer />
 
         {items.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-32 gap-4 text-center">
