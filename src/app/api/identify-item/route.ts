@@ -1,0 +1,52 @@
+import { NextRequest, NextResponse } from 'next/server'
+import Anthropic from '@anthropic-ai/sdk'
+
+const client = new Anthropic()
+
+export async function POST(req: NextRequest) {
+  try {
+    const formData = await req.formData()
+    const file = formData.get('image') as File | null
+
+    if (!file) {
+      return NextResponse.json({ error: 'No image provided' }, { status: 400 })
+    }
+
+    const buffer = await file.arrayBuffer()
+    const base64 = Buffer.from(buffer).toString('base64')
+    const mediaType = (file.type || 'image/jpeg') as 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif'
+
+    const message = await client.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 256,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'image',
+              source: { type: 'base64', media_type: mediaType, data: base64 },
+            },
+            {
+              type: 'text',
+              text: 'Look at this image and identify the Star Wars Galoob collectible item. Return JSON: { "name": "item name", "serie": "Micro Machines|Action Fleet|Epic Force|...", "set_nummer": "set number if visible or null", "jahr": year_as_number_or_null, "zustand": "OVP (ungeöffnet)|Neu|Sehr gut|Gut|Gebraucht|Beschädigt" }. If you cannot identify the item, return { "name": null, "serie": null, "set_nummer": null, "jahr": null, "zustand": null }.',
+            },
+          ],
+        },
+      ],
+    })
+
+    const text = message.content[0].type === 'text' ? message.content[0].text.trim() : ''
+
+    const jsonMatch = text.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) {
+      return NextResponse.json({ name: null, serie: null, set_nummer: null, jahr: null, zustand: null })
+    }
+
+    const result = JSON.parse(jsonMatch[0])
+    return NextResponse.json(result)
+  } catch (err) {
+    console.error('identify-item error:', err)
+    return NextResponse.json({ error: 'Failed to identify item' }, { status: 500 })
+  }
+}
