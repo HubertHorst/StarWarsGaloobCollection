@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, ChevronLeft, ChevronRight, Calendar, Hash, Truck, PackageCheck } from 'lucide-react'
+import { ArrowLeft, Calendar, Hash, Truck, PackageCheck } from 'lucide-react'
 import { getDb } from '@/lib/db'
 import { safeParseJson } from '@/lib/validate'
 import { Item } from '@/types/item'
@@ -16,6 +16,7 @@ import CoverZoom from '@/components/CoverZoom'
 import PriceCheckButton from '@/components/PriceCheckButton'
 import LieferungToggle from '@/components/LieferungToggle'
 import SammlungToggle from '@/components/SammlungToggle'
+import ItemNavigation from '@/components/ItemNavigation'
 
 async function getNeighbours(currentId: string): Promise<{ prev: string | null; next: string | null }> {
   const db = getDb()
@@ -53,7 +54,7 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ id:
 
   if (!item) notFound()
 
-  const { prev, next } = await getNeighbours(item.id)
+  const { prev: fallbackPrev, next: fallbackNext } = await getNeighbours(item.id)
 
   const coverUrl = item.cover_url ?? null
   const userPhotos = item.user_photos ?? []
@@ -70,30 +71,11 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ id:
               <ArrowLeft className="w-5 h-5" />
               <span className="text-sm">Sammlung</span>
             </Link>
-            <div className="flex items-center gap-1 ml-2">
-              {prev ? (
-                <Link
-                  href={`/items/${prev}`}
-                  className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
-                  title="Vorheriger Artikel"
-                >
-                  <ChevronLeft className="w-5 h-5" />
-                </Link>
-              ) : (
-                <span className="p-1.5 text-zinc-700"><ChevronLeft className="w-5 h-5" /></span>
-              )}
-              {next ? (
-                <Link
-                  href={`/items/${next}`}
-                  className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
-                  title="Nächster Artikel"
-                >
-                  <ChevronRight className="w-5 h-5" />
-                </Link>
-              ) : (
-                <span className="p-1.5 text-zinc-700"><ChevronRight className="w-5 h-5" /></span>
-              )}
-            </div>
+            <ItemNavigation
+              currentId={item.id}
+              fallbackPrev={fallbackPrev}
+              fallbackNext={fallbackNext}
+            />
           </div>
           <div className="flex items-center gap-2">
             <RefreshFromImageButton itemId={item.id} />

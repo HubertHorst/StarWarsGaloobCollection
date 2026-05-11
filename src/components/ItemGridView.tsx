@@ -58,11 +58,30 @@ export default function ItemGridView({ items: initialItems, editMode = false }: 
   const [pending, setPending] = useState<PendingMerge | null>(null)
   const [merging, setMerging] = useState(false)
 
-  // ── Filter / sort state ────────────────────────────────────────────────────
+  // ── Filter / sort state — persisted in sessionStorage ────────────────────
   const [filters, setFilters] = useState({
     name: '', serie: '', zustand: '', lieferung: '', sammlung: '',
   })
   const [sort, setSort] = useState<{ field: SortField; dir: SortDir }>({ field: 'name', dir: 'asc' })
+
+  // Restore on mount
+  useEffect(() => {
+    try {
+      const f = sessionStorage.getItem('grid-filters')
+      if (f) setFilters(JSON.parse(f))
+      const s = sessionStorage.getItem('grid-sort')
+      if (s) setSort(JSON.parse(s))
+    } catch { /* ignore */ }
+  }, [])
+
+  // Persist whenever state changes
+  useEffect(() => {
+    sessionStorage.setItem('grid-filters', JSON.stringify(filters))
+  }, [filters])
+
+  useEffect(() => {
+    sessionStorage.setItem('grid-sort', JSON.stringify(sort))
+  }, [sort])
 
   const hasFilters = filters.name || filters.serie || filters.zustand || filters.lieferung || filters.sammlung
 
@@ -90,6 +109,11 @@ export default function ItemGridView({ items: initialItems, editMode = false }: 
         }
       })
   }, [initialItems, filters, sort])
+
+  // Persist filtered ID order so detail view can use it for prev/next
+  useEffect(() => {
+    sessionStorage.setItem('grid-filtered-ids', JSON.stringify(filtered.map((i) => i.id)))
+  }, [filtered])
 
   function toggleDir() {
     setSort((s) => ({ ...s, dir: s.dir === 'asc' ? 'desc' : 'asc' }))
