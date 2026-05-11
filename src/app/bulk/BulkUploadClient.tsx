@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useCallback, useRef } from 'react'
-import Image from 'next/image'
 import Link from 'next/link'
 import { Upload, CheckCircle2, XCircle, Loader2, AlertCircle, Layers } from 'lucide-react'
 import { compressImage } from '@/lib/compressImage'
@@ -40,6 +39,54 @@ function statusColor(status: ItemStatus): string {
   }
 }
 
+function isAccepted(file: File): boolean {
+  const name = file.name.toLowerCase()
+  return (
+    file.type.startsWith('image/') ||
+    file.type === 'video/mp4' ||
+    file.type === 'video/quicktime' ||
+    name.endsWith('.heic') ||
+    name.endsWith('.heif') ||
+    name.endsWith('.mp4') ||
+    name.endsWith('.mov')
+  )
+}
+
+/** Extract the first frame of a video file as a JPEG File */
+async function extractVideoFrame(file: File): Promise<File> {
+  return new Promise((resolve) => {
+    const video = document.createElement('video')
+    const url = URL.createObjectURL(file)
+    video.src = url
+    video.muted = true
+    video.playsInline = true
+    video.crossOrigin = 'anonymous'
+
+    const capture = () => {
+      URL.revokeObjectURL(url)
+      const canvas = document.createElement('canvas')
+      canvas.width = video.videoWidth || 640
+      canvas.height = video.videoHeight || 480
+      canvas.getContext('2d')!.drawImage(video, 0, 0)
+      canvas.toBlob(
+        (blob) => {
+          if (blob) {
+            resolve(new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' }))
+          } else {
+            resolve(file)
+          }
+        },
+        'image/jpeg',
+        0.85
+      )
+    }
+
+    video.onseeked = capture
+    video.onloadeddata = () => { video.currentTime = 0.5 }
+    video.onerror = () => { URL.revokeObjectURL(url); resolve(file) }
+  })
+}
+
 export default function BulkUploadClient() {
   const inputRef = useRef<HTMLInputElement>(null)
   const [items, setItems] = useState<BulkItem[]>([])
@@ -51,8 +98,8 @@ export default function BulkUploadClient() {
   }
 
   function addFiles(files: File[]) {
-    const imageFiles = files.filter((f) => f.type.startsWith('image/'))
-    const newItems: BulkItem[] = imageFiles.map((file) => ({
+    const accepted = files.filter(isAccepted)
+    const newItems: BulkItem[] = accepted.map((file) => ({
       id: crypto.randomUUID(),
       file,
       preview: URL.createObjectURL(file),
@@ -78,7 +125,14 @@ export default function BulkUploadClient() {
   const processItem = useCallback(async (item: BulkItem) => {
     try {
       updateItem(item.id, { status: 'uploading' })
-      const compressed = await compressImage(item.file)
+
+      // For video files (MP4/MOV from Live Photos), extract a still frame first
+      const isVideo = item.file.type.startsWith('video/') ||
+        item.file.name.toLowerCase().endsWith('.mp4') ||
+        item.file.name.toLowerCase().endsWith('.mov')
+
+      const imageFile = isVideo ? await extractVideoFrame(item.file) : item.file
+      const compressed = await compressImage(imageFile)
 
       const coverFd = new FormData()
       coverFd.append('file', compressed)
@@ -154,7 +208,7 @@ export default function BulkUploadClient() {
       <div>
         <h2 className="text-2xl font-bold mb-1">Bulk Import</h2>
         <p className="text-zinc-400 text-sm">
-          Bis zu 100 Fotos auf einmal hochladen. Claude identifiziert jeden Artikel automatisch.
+          Bis zu 100 Fotos auf einmal hochladen. HEIC und MP4 (Live Photos) werden automatisch konvertiert.
         </p>
       </div>
 
@@ -167,11 +221,10 @@ export default function BulkUploadClient() {
           isDragging ? 'border-yellow-500 bg-yellow-500/10' : 'border-zinc-700 hover:border-zinc-500 hover:bg-zinc-800/50'
         }`}
       >
-        {/* Transparent input covers entire drop zone — most reliable cross-browser approach */}
         <input
           ref={inputRef}
           type="file"
-          accept="image/*"
+          accept="image/*,.heic,.heif,video/mp4,video/quicktime,.mp4,.mov"
           multiple
           onChange={handleFileInput}
           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
@@ -182,7 +235,7 @@ export default function BulkUploadClient() {
           </div>
           <div>
             <p className="text-white font-semibold">Fotos hierher ziehen oder klicken zum Auswählen</p>
-            <p className="text-zinc-500 text-sm mt-1">Mehrere Dateien gleichzeitig auswählen — bis zu 100 Bilder</p>
+            <p className="text-zinc-500 text-sm mt-1">JPG, PNG, HEIC, MP4 (Live Photos) — bis zu 100 Dateien</p>
           </div>
         </div>
       </div>
@@ -216,9 +269,9 @@ export default function BulkUploadClient() {
                 className="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold px-6 py-2.5 rounded-xl transition-colors"
               >
                 {running ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" /> Verarbeite {pending} Bilder…</>
+                  <><Loader2 className="w-4 h-4 animate-spin" /> Verarbeite {pending} Dateien…</>
                 ) : (
-                  <><Upload className="w-4 h-4" /> Import starten ({pending} Bilder)</>
+                  <><Upload className="w-4 h-4" /> Import starten ({pending} Dateien)</>
                 )}
               </button>
             )}
@@ -242,55 +295,74 @@ export default function BulkUploadClient() {
 
           {/* Image grid */}
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
-            {items.map((item) => (
-              <div key={item.id} className="space-y-1.5">
-                <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-zinc-800 ring-1 ring-white/5">
-                  <Image src={item.preview} alt="" fill className="object-cover" sizes="160px" />
+            {items.map((item) => {
+              const isVideo = item.file.type.startsWith('video/') ||
+                item.file.name.toLowerCase().endsWith('.mp4') ||
+                item.file.name.toLowerCase().endsWith('.mov')
+              return (
+                <div key={item.id} className="space-y-1.5">
+                  <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-zinc-800 ring-1 ring-white/5">
+                    {isVideo ? (
+                      <video
+                        src={item.preview}
+                        className="absolute inset-0 w-full h-full object-cover"
+                        muted
+                        playsInline
+                      />
+                    ) : (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={item.preview}
+                        alt=""
+                        className="absolute inset-0 w-full h-full object-cover"
+                      />
+                    )}
 
-                  {/* Status overlay */}
-                  <div className={`absolute inset-0 flex items-center justify-center transition-all ${
-                    item.status === 'done' ? 'bg-black/20' :
-                    item.status === 'error' ? 'bg-red-900/40' :
-                    item.status === 'queued' ? 'bg-black/0' :
-                    'bg-black/60'
-                  }`}>
-                    {item.status === 'done' && (
-                      <CheckCircle2 className="w-8 h-8 text-green-400 drop-shadow-lg" />
+                    {/* Status overlay */}
+                    <div className={`absolute inset-0 flex items-center justify-center transition-all ${
+                      item.status === 'done' ? 'bg-black/20' :
+                      item.status === 'error' ? 'bg-red-900/40' :
+                      item.status === 'queued' ? 'bg-black/0' :
+                      'bg-black/60'
+                    }`}>
+                      {item.status === 'done' && (
+                        <CheckCircle2 className="w-8 h-8 text-green-400 drop-shadow-lg" />
+                      )}
+                      {item.status === 'error' && (
+                        <XCircle className="w-8 h-8 text-red-400 drop-shadow-lg" />
+                      )}
+                      {['uploading', 'identifying', 'saving'].includes(item.status) && (
+                        <Loader2 className="w-8 h-8 text-white animate-spin drop-shadow-lg" />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Name + status */}
+                  <div className="px-0.5">
+                    <p className="text-white text-xs font-medium leading-tight truncate">
+                      {item.name ?? item.file.name.replace(/\.[^.]+$/, '')}
+                    </p>
+                    {item.serie && (
+                      <p className="text-zinc-500 text-xs truncate">{item.serie}</p>
                     )}
-                    {item.status === 'error' && (
-                      <XCircle className="w-8 h-8 text-red-400 drop-shadow-lg" />
-                    )}
-                    {['uploading', 'identifying', 'saving'].includes(item.status) && (
-                      <Loader2 className="w-8 h-8 text-white animate-spin drop-shadow-lg" />
-                    )}
+                    <p className={`text-xs mt-0.5 ${statusColor(item.status)}`}>
+                      {item.status === 'done' && item.itemId ? (
+                        <Link href={`/items/${item.itemId}`} className="hover:underline">
+                          {statusLabel(item)}
+                        </Link>
+                      ) : item.status === 'error' ? (
+                        <span className="flex items-center gap-0.5">
+                          <AlertCircle className="w-3 h-3" />
+                          {statusLabel(item)}
+                        </span>
+                      ) : (
+                        statusLabel(item)
+                      )}
+                    </p>
                   </div>
                 </div>
-
-                {/* Name + status */}
-                <div className="px-0.5">
-                  <p className="text-white text-xs font-medium leading-tight truncate">
-                    {item.name ?? item.file.name.replace(/\.[^.]+$/, '')}
-                  </p>
-                  {item.serie && (
-                    <p className="text-zinc-500 text-xs truncate">{item.serie}</p>
-                  )}
-                  <p className={`text-xs mt-0.5 ${statusColor(item.status)}`}>
-                    {item.status === 'done' && item.itemId ? (
-                      <Link href={`/items/${item.itemId}`} className="hover:underline">
-                        {statusLabel(item)}
-                      </Link>
-                    ) : item.status === 'error' ? (
-                      <span className="flex items-center gap-0.5">
-                        <AlertCircle className="w-3 h-3" />
-                        {statusLabel(item)}
-                      </span>
-                    ) : (
-                      statusLabel(item)
-                    )}
-                  </p>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </>
       )}
