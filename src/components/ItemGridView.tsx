@@ -95,7 +95,7 @@ export default function ItemGridView({ items: initialItems, editMode = false }: 
               onDragStart={(e) => { setDragId(item.id); e.dataTransfer.effectAllowed = 'move' }}
               onDragEnd={() => { setDragId(null); setOverId(null) }}
               onDragOver={(e) => { e.preventDefault(); if (item.id !== dragId) setOverId(item.id) }}
-              onDragLeave={() => setOverId(null)}
+              onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setOverId(null) }}
               onDrop={(e) => {
                 e.preventDefault()
                 setOverId(null)
