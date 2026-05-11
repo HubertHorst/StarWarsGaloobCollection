@@ -8,7 +8,6 @@ import ItemCard from '@/components/ItemCard'
 import BulkActionBar from '@/components/BulkActionBar'
 import { Loader2, Merge, CheckSquare, Square, ChevronUp, ChevronDown, X, ImagePlus } from 'lucide-react'
 import { CONDITION_PRESETS } from '@/lib/conditionPresets'
-import { SERIES_PRESETS } from '@/lib/seriesPresets'
 import { compareNames } from '@/lib/sortItems'
 import CoverSearchModal, { CoverSearchItem } from '@/components/CoverSearchModal'
 
@@ -117,6 +116,12 @@ export default function ItemGridView({ items: initialItems, editMode = false }: 
       })
   }, [initialItems, filters, sort])
 
+  // Derive unique series list from actual items
+  const series = useMemo(
+    () => [...new Set(initialItems.map((i) => i.serie).filter(Boolean) as string[])].sort(),
+    [initialItems],
+  )
+
   // Persist filtered ID order so detail view can use it for prev/next
   useEffect(() => {
     sessionStorage.setItem('grid-filtered-ids', JSON.stringify(filtered.map((i) => i.id)))
@@ -181,7 +186,7 @@ export default function ItemGridView({ items: initialItems, editMode = false }: 
       {/* Serie */}
       <select value={filters.serie} onChange={(e) => setFilters((f) => ({ ...f, serie: e.target.value }))} className={sel}>
         <option value="">Alle Serien</option>
-        {SERIES_PRESETS.map((s) => <option key={s} value={s}>{s}</option>)}
+        {series.map((s) => <option key={s} value={s}>{s}</option>)}
       </select>
 
       {/* Zustand */}

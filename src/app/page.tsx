@@ -5,8 +5,6 @@ import { getDb, initDb } from '@/lib/db'
 import { safeParseJson } from '@/lib/validate'
 import ItemGridView from '@/components/ItemGridView'
 import ItemListView from '@/components/ItemListView'
-import SearchBar from '@/components/SearchBar'
-import SerieFilter from '@/components/SerieFilter'
 import ViewToggle from '@/components/ViewToggle'
 import ChangelogPanel from '@/components/ChangelogPanel'
 import ScrollRestorer from '@/components/ScrollRestorer'
@@ -14,7 +12,7 @@ import { Item } from '@/types/item'
 import { sortItems } from '@/lib/sortItems'
 
 interface Props {
-  searchParams: Promise<{ q?: string; serie?: string; view?: string; edit?: string }>
+  searchParams: Promise<{ view?: string; edit?: string }>
 }
 
 function parseItem(row: Record<string, unknown>): Item {
@@ -24,19 +22,12 @@ function parseItem(row: Record<string, unknown>): Item {
   } as Item
 }
 
-async function getItems(search?: string, serie?: string): Promise<Item[]> {
+async function getItems(): Promise<Item[]> {
   await initDb()
   const db = getDb()
-  let sql = 'SELECT * FROM items'
-  const args: string[] = []
-  const conditions: string[] = []
-
-  if (serie) { conditions.push('serie = ?'); args.push(serie) }
-  if (search) { conditions.push('name LIKE ?'); args.push(`%${search}%`) }
-  if (conditions.length) sql += ' WHERE ' + conditions.join(' AND ')
 
   // Sort: serie alpha, then numeric for #N names, then plain alpha
-  sql += ` ORDER BY serie ASC,
+  const sql = `SELECT * FROM items ORDER BY serie ASC,
     CASE
       WHEN INSTR(name, '#') > 0
         THEN PRINTF('%08d', CAST(TRIM(SUBSTR(name, INSTR(name, '#') + 1)) AS INTEGER))
@@ -45,21 +36,19 @@ async function getItems(search?: string, serie?: string): Promise<Item[]> {
       ELSE 'zzzzzzzz' || LOWER(name)
     END ASC`
 
-  const { rows } = await db.execute({ sql, args })
-  // JS sort as secondary safety net (handles edge-cases SQL misses)
+  const { rows } = await db.execute({ sql, args: [] })
   return sortItems(rows.map((r) => parseItem(r as Record<string, unknown>)))
 }
 
 export default async function LibraryPage({ searchParams }: Props) {
-  const { q, serie, view, edit } = await searchParams
+  const { view, edit } = await searchParams
   const currentView = view === 'list' ? 'list' : 'grid'
   const editMode = edit === '1' && currentView === 'grid'
-  const items = await getItems(q, serie)
+  const items = await getItems()
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
-      <div className="sticky top-0 z-10">
-      <header className="border-b border-white/5 bg-zinc-900/80 backdrop-blur">
+      <header className="sticky top-0 z-10 border-b border-white/5 bg-zinc-900/80 backdrop-blur">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <Star className="w-6 h-6 text-yellow-400 fill-yellow-400" />
@@ -68,14 +57,15 @@ export default async function LibraryPage({ searchParams }: Props) {
               {items.length} {items.length === 1 ? 'Artikel' : 'Artikel'}
             </span>
           </div>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
             <ChangelogPanel />
+            <ViewToggle current={currentView} />
             {currentView === 'grid' && (
               <EditModeToggle editMode={editMode} />
             )}
             <Link
               href="/bulk"
-              className="flex items-center gap-2 bg-zinc-700 hover:bg-zinc-600 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+              className="hidden sm:flex items-center gap-2 bg-zinc-700 hover:bg-zinc-600 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
             >
               <Layers className="w-4 h-4" />
               Bulk Import
@@ -85,19 +75,12 @@ export default async function LibraryPage({ searchParams }: Props) {
               className="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
             >
               <Plus className="w-4 h-4" />
-              Artikel hinzufügen
+              <span className="hidden sm:inline">Artikel hinzufügen</span>
+              <span className="sm:hidden">Neu</span>
             </Link>
           </div>
         </div>
       </header>
-      <div className="border-b border-white/5 bg-zinc-900/80 backdrop-blur">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-col sm:flex-row gap-3">
-          <SearchBar defaultValue={q} />
-          <SerieFilter selected={serie} />
-          <ViewToggle current={currentView} />
-        </div>
-      </div>
-      </div>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
         <ScrollRestorer />
@@ -106,24 +89,18 @@ export default async function LibraryPage({ searchParams }: Props) {
           <div className="flex flex-col items-center justify-center py-32 gap-4 text-center">
             <Star className="w-16 h-16 text-zinc-700" />
             <div>
-              <p className="text-zinc-400 text-lg font-medium">
-                {q || serie ? 'Keine Artikel gefunden' : 'Deine Sammlung ist leer'}
-              </p>
+              <p className="text-zinc-400 text-lg font-medium">Deine Sammlung ist leer</p>
               <p className="text-zinc-600 text-sm mt-1">
-                {q || serie
-                  ? 'Versuche eine andere Suche oder einen anderen Filter'
-                  : 'Füge deinen ersten Artikel hinzu, indem du ein Foto machst'}
+                Füge deinen ersten Artikel hinzu, indem du ein Foto machst
               </p>
             </div>
-            {!q && !serie && (
-              <Link
-                href="/add"
-                className="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-500 text-white text-sm font-medium px-5 py-2.5 rounded-lg transition-colors mt-2"
-              >
-                <Plus className="w-4 h-4" />
-                Ersten Artikel hinzufügen
-              </Link>
-            )}
+            <Link
+              href="/add"
+              className="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-500 text-white text-sm font-medium px-5 py-2.5 rounded-lg transition-colors mt-2"
+            >
+              <Plus className="w-4 h-4" />
+              Ersten Artikel hinzufügen
+            </Link>
           </div>
         ) : currentView === 'list' ? (
           <ItemListView items={items} />
