@@ -59,12 +59,19 @@ export default function CoverSearchModal({ items, onClose, onApplied }: Props) {
     setSelected(null)
     setSearchError(null)
     try {
-      const res = await fetch(`/api/cover-search?q=${encodeURIComponent(q.trim())}`)
+      const res = await fetch(`/api/cover-search?q=${encodeURIComponent(q.trim())}&debug=1`)
       const data = await res.json()
       const urls: string[] = data.urls ?? []
       setResults(urls)
-      if (data.error) setSearchError(`API: ${data.error}`)
-      else if (urls.length === 0) setSearchError('API returned 0 URLs')
+      if (data.error) {
+        setSearchError(`API: ${data.error}`)
+      } else if (urls.length === 0) {
+        // Show full debug info so we can diagnose server-side
+        const d = data.debug ?? {}
+        setSearchError(
+          `0 URLs — initStatus:${d.initStatus} bodyLen:${d.initBodyLen} vqd:${d.vqd ?? 'null'} imgStatus:${d.imgStatus} imgLen:${d.imgBodyLen} results:${d.resultCount} | ${d.error ?? d.imgBodySnippet?.substring(0,80) ?? ''}`
+        )
+      }
     } catch (e) {
       setSearchError(`Fetch failed: ${e}`)
       setResults([])
