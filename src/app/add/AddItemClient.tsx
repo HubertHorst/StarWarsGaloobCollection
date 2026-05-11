@@ -7,6 +7,7 @@ import { Upload, Camera, CheckCircle2, Loader2, AlertCircle, X, ImagePlus } from
 import { compressImage } from '@/lib/compressImage'
 import { CONDITION_PRESETS, DEFAULT_CONDITION } from '@/lib/conditionPresets'
 import { SERIES_PRESETS } from '@/lib/seriesPresets'
+import { getDefaultWert } from '@/lib/seriesDefaultWert'
 
 type Step = 'upload' | 'identifying' | 'results' | 'saving'
 
@@ -40,7 +41,13 @@ export default function AddItemClient() {
   const [isDragging, setIsDragging] = useState(false)
 
   function setField(key: keyof EditForm, value: string) {
-    setForm((f) => ({ ...f, [key]: value }))
+    setForm((f) => {
+      const updated = { ...f, [key]: value }
+      if (key === 'serie' && !f.wert) {
+        updated.wert = getDefaultWert(value) ?? ''
+      }
+      return updated
+    })
   }
 
   async function processFile(rawFile: File) {
@@ -79,6 +86,7 @@ export default function AddItemClient() {
             set_nummer: data.set_nummer ?? '',
             jahr: data.jahr ? String(data.jahr) : '',
             zustand: data.zustand ?? DEFAULT_CONDITION,
+            wert: f.wert || getDefaultWert(data.serie) || '',
           }))
         }
       }

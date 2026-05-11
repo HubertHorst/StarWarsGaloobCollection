@@ -4,6 +4,7 @@ import { safeParseJson } from '@/lib/validate'
 import { Item } from '@/types/item'
 import { randomUUID } from 'crypto'
 import { DEFAULT_CONDITION } from '@/lib/conditionPresets'
+import { getDefaultWert } from '@/lib/seriesDefaultWert'
 
 function parseItem(row: Record<string, unknown>): Item {
   return {
@@ -56,7 +57,7 @@ export async function POST(req: NextRequest) {
         body.set_nummer ?? null,
         body.jahr ?? null,
         body.zustand ?? DEFAULT_CONDITION,
-        body.wert ?? null,
+        body.wert ?? getDefaultWert(body.serie ?? null),
         body.kaufpreis ?? null,
         body.lieferung_ausstehend ?? 0,
         body.cover_url ?? null,
