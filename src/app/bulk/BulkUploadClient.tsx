@@ -2,11 +2,12 @@
 
 import { useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
-import { Upload, CheckCircle2, XCircle, Loader2, AlertCircle, Layers, Merge } from 'lucide-react'
+import { Upload, CheckCircle2, XCircle, Loader2, AlertCircle, Layers, Merge, Trash2 } from 'lucide-react'
 import { compressImage } from '@/lib/compressImage'
 import { DEFAULT_CONDITION } from '@/lib/conditionPresets'
+import { Item } from '@/types/item'
 
-type ItemStatus = 'queued' | 'uploading' | 'identifying' | 'saving' | 'done' | 'error'
+type ItemStatus = 'queued' | 'uploading' | 'identifying' | 'saving' | 'done' | 'error' | 'review' | 'discarded'
 
 interface BulkItem {
   id: string
@@ -15,8 +16,11 @@ interface BulkItem {
   status: ItemStatus
   name: string | null
   serie: string | null
+  coverUrl: string | null
   errorMsg: string | null
   itemId: string | null
+  pendingPayload?: Record<string, unknown>
+  duplicateItems?: Item[]
 }
 
 interface PendingMerge {
@@ -38,16 +42,20 @@ function statusLabel(item: BulkItem): string {
     case 'uploading': return 'Hochladen…'
     case 'identifying': return 'Claude liest…'
     case 'saving': return 'Speichern…'
-    case 'done': return 'Gespeichert'
-    case 'error': return item.errorMsg ?? 'Fehler'
+    case 'done':      return 'Gespeichert'
+    case 'review':    return 'Bereits vorhanden – Bestätigung nötig'
+    case 'discarded': return 'Upload verworfen'
+    case 'error':     return item.errorMsg ?? 'Fehler'
   }
 }
 
 function statusColor(status: ItemStatus): string {
   switch (status) {
-    case 'done': return 'text-green-400'
-    case 'error': return 'text-red-400'
-    default: return 'text-zinc-400'
+    case 'done':      return 'text-green-400'
+    case 'review':    return 'text-amber-400'
+    case 'discarded': return 'text-zinc-600'
+    case 'error':     return 'text-red-400'
+    default:          return 'text-zinc-400'
   }
 }
 
@@ -147,6 +155,7 @@ export default function BulkUploadClient() {
           status: 'queued' as ItemStatus,
           name: null,
           serie: null,
+          coverUrl: null,
           errorMsg: null,
           itemId: null,
         }
@@ -191,13 +200,29 @@ export default function BulkUploadClient() {
       const jahr = identifyData.jahr ?? null
       const zustand = identifyData.zustand ?? DEFAULT_CONDITION
 
-      updateItem(item.id, { name, serie })
+      updateItem(item.id, { name, serie, coverUrl })
+
+      // Check for name duplicates before saving
+      const payload: Record<string, unknown> = {
+        name, serie, set_nummer, jahr, zustand,
+        cover_url: coverUrl, user_photos: coverUrl ? [coverUrl] : null,
+      }
+      try {
+        const dupeRes = await fetch(`/api/items?q=${encodeURIComponent(name)}`)
+        const all: Item[] = dupeRes.ok ? await dupeRes.json() : []
+        const dupeItems = all.filter((i) => i.name.toLowerCase() === name.toLowerCase())
+        if (dupeItems.length > 0) {
+          updateItem(item.id, { status: 'review', pendingPayload: payload, duplicateItems: dupeItems })
+          return  // wait for user decision
+        }
+      } catch { /* ignore, proceed with save */ }
+
       updateItem(item.id, { status: 'saving' })
 
       const saveRes = await fetch('/api/items', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, serie, set_nummer, jahr, zustand, cover_url: coverUrl, user_photos: coverUrl ? [coverUrl] : null }),
+        body: JSON.stringify(payload),
       })
 
       if (!saveRes.ok) throw new Error('Speichern fehlgeschlagen')
@@ -210,6 +235,41 @@ export default function BulkUploadClient() {
       })
     }
   }, [])
+
+  async function handleReviewMerge(itemId: string, target: Item) {
+    const bulkItem = items.find((i) => i.id === itemId)
+    if (!bulkItem) return
+    const existingPhotos = Array.isArray(target.user_photos) ? target.user_photos : []
+    const newPhotos = bulkItem.coverUrl ? [...existingPhotos, bulkItem.coverUrl] : existingPhotos
+    await fetch(`/api/items/${target.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_photos: newPhotos }),
+    })
+    updateItem(itemId, { status: 'discarded' })
+  }
+
+  async function handleReviewNew(itemId: string) {
+    const bulkItem = items.find((i) => i.id === itemId)
+    if (!bulkItem?.pendingPayload) return
+    updateItem(itemId, { status: 'saving' })
+    try {
+      const saveRes = await fetch('/api/items', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(bulkItem.pendingPayload),
+      })
+      if (!saveRes.ok) throw new Error('Speichern fehlgeschlagen')
+      const saved = await saveRes.json()
+      updateItem(itemId, { status: 'done', itemId: saved.id })
+    } catch (err) {
+      updateItem(itemId, { status: 'error', errorMsg: err instanceof Error ? err.message : 'Unbekannter Fehler' })
+    }
+  }
+
+  function handleReviewDiscard(itemId: string) {
+    updateItem(itemId, { status: 'discarded' })
+  }
 
   async function runBulk() {
     const queued = items.filter((i) => i.status === 'queued' || i.status === 'error')
@@ -234,13 +294,17 @@ export default function BulkUploadClient() {
     setPending(null)
   }
 
-  const done = items.filter((i) => i.status === 'done').length
-  const errors = items.filter((i) => i.status === 'error').length
+  const done         = items.filter((i) => i.status === 'done').length
+  const errors       = items.filter((i) => i.status === 'error').length
+  const reviews      = items.filter((i) => i.status === 'review').length
+  const discarded    = items.filter((i) => i.status === 'discarded').length
   const pending_count = items.filter((i) => i.status === 'queued').length
-  const total = items.length
-  const progress = total > 0 ? Math.round((done + errors) / total * 100) : 0
-  const allDone = total > 0 && done + errors === total && !running
-  const hasDone = done > 0
+  const total        = items.length
+  const processed    = done + errors + reviews + discarded
+  const progress     = total > 0 ? Math.round(processed / total * 100) : 0
+  const allDone      = total > 0 && processed === total && !running
+  const hasDone      = done > 0
+  const reviewItem   = !running ? items.find((i) => i.status === 'review') ?? null : null
 
   return (
     <div className="space-y-6">
@@ -293,9 +357,11 @@ export default function BulkUploadClient() {
           {/* Progress bar + stats */}
           <div className="bg-zinc-900 rounded-xl p-4 space-y-3 border border-white/5">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-zinc-400">{done + errors} / {total} verarbeitet</span>
+              <span className="text-zinc-400">{processed} / {total} verarbeitet</span>
               <div className="flex gap-4 text-xs">
                 <span className="text-green-400">{done} gespeichert</span>
+                {reviews > 0 && <span className="text-amber-400">{reviews} Duplikat{reviews !== 1 ? 'e' : ''}</span>}
+                {discarded > 0 && <span className="text-zinc-500">{discarded} verworfen</span>}
                 {errors > 0 && <span className="text-red-400">{errors} Fehler</span>}
                 {pending_count > 0 && <span className="text-zinc-500">{pending_count} wartend</span>}
               </div>
@@ -405,12 +471,20 @@ export default function BulkUploadClient() {
 
                     {/* Status overlay */}
                     <div className={`absolute inset-0 flex items-center justify-center transition-all ${
-                      item.status === 'done' ? 'bg-black/0' :
-                      item.status === 'error' ? 'bg-red-900/40' :
-                      item.status === 'queued' ? 'bg-black/0' : 'bg-black/60'
+                      item.status === 'done'       ? 'bg-black/0' :
+                      item.status === 'review'     ? 'bg-amber-900/50' :
+                      item.status === 'discarded'  ? 'bg-black/60' :
+                      item.status === 'error'      ? 'bg-red-900/40' :
+                      item.status === 'queued'     ? 'bg-black/0' : 'bg-black/60'
                     }`}>
                       {item.status === 'done' && !isOver && (
                         <CheckCircle2 className="w-6 h-6 text-green-400 drop-shadow-lg opacity-70" />
+                      )}
+                      {item.status === 'review' && (
+                        <AlertCircle className="w-8 h-8 text-amber-400 drop-shadow-lg" />
+                      )}
+                      {item.status === 'discarded' && (
+                        <Trash2 className="w-8 h-8 text-zinc-500 drop-shadow-lg" />
                       )}
                       {item.status === 'error' && <XCircle className="w-8 h-8 text-red-400 drop-shadow-lg" />}
                       {['uploading', 'identifying', 'saving'].includes(item.status) && (
@@ -453,6 +527,75 @@ export default function BulkUploadClient() {
             </p>
           )}
         </>
+      )}
+
+      {/* Duplicate review dialog */}
+      {reviewItem && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-zinc-900 border border-white/10 rounded-2xl p-6 max-w-sm w-full shadow-2xl space-y-4">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-amber-400 flex-shrink-0" />
+              <h2 className="text-lg font-bold">Artikel bereits vorhanden</h2>
+            </div>
+
+            {/* New photo */}
+            <div className="flex items-center gap-3">
+              <div className="relative w-12 aspect-[3/4] rounded-lg overflow-hidden bg-zinc-800 flex-shrink-0 ring-2 ring-amber-500/50">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={reviewItem.preview} alt="" className="absolute inset-0 w-full h-full object-cover" />
+              </div>
+              <div>
+                <p className="text-sm text-white font-medium">{reviewItem.name ?? reviewItem.file.name}</p>
+                {reviewItem.serie && <p className="text-xs text-zinc-500">{reviewItem.serie}</p>}
+                <p className="text-xs text-amber-400">Neues Foto</p>
+              </div>
+            </div>
+
+            <p className="text-zinc-400 text-sm">
+              Dieser Artikel ist bereits in der Sammlung. Foto dem bestehenden Eintrag hinzufügen oder als neuen Artikel anlegen?
+            </p>
+
+            {/* Existing items to merge into */}
+            <div className="space-y-2">
+              <p className="text-xs text-zinc-500 uppercase tracking-wide">Vorhandene Einträge</p>
+              {reviewItem.duplicateItems?.map((existing) => (
+                <button
+                  key={existing.id}
+                  onClick={() => handleReviewMerge(reviewItem.id, existing)}
+                  className="w-full flex items-center gap-3 bg-zinc-800 hover:bg-zinc-700 border border-white/10 rounded-xl p-3 transition-colors text-left"
+                >
+                  {existing.cover_url && (
+                    <div className="relative w-10 aspect-[3/4] rounded-lg overflow-hidden flex-shrink-0">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={existing.cover_url} alt={existing.name} className="absolute inset-0 w-full h-full object-cover" />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-white font-medium truncate">{existing.name}</p>
+                    {existing.serie && <p className="text-xs text-zinc-500 truncate">{existing.serie}</p>}
+                    <p className="text-xs text-yellow-400">Fotos hinzufügen →</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleReviewNew(reviewItem.id)}
+                className="flex-1 py-2.5 rounded-xl bg-yellow-600 hover:bg-yellow-500 text-white text-sm font-medium transition-colors"
+              >
+                Als neuen Artikel anlegen
+              </button>
+              <button
+                onClick={() => handleReviewDiscard(reviewItem.id)}
+                title="Upload verwerfen"
+                className="px-3 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-red-400 transition-colors"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Merge confirmation dialog */}

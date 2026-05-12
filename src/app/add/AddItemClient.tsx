@@ -3,11 +3,12 @@
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { Upload, Camera, CheckCircle2, Loader2, AlertCircle, X, ImagePlus } from 'lucide-react'
+import { Upload, Camera, CheckCircle2, Loader2, AlertCircle, X, ImagePlus, Trash2 } from 'lucide-react'
 import { compressImage } from '@/lib/compressImage'
 import { CONDITION_PRESETS, DEFAULT_CONDITION } from '@/lib/conditionPresets'
 import { SERIES_PRESETS } from '@/lib/seriesPresets'
 import { getDefaultWert } from '@/lib/seriesDefaultWert'
+import { Item } from '@/types/item'
 
 type Step = 'upload' | 'identifying' | 'results' | 'saving'
 
@@ -39,6 +40,28 @@ export default function AddItemClient() {
   const [uploadingCover, setUploadingCover] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
+  const [duplicates, setDuplicates] = useState<Item[]>([])
+
+  async function checkDuplicates(name: string) {
+    if (!name.trim()) return
+    try {
+      const res = await fetch(`/api/items?q=${encodeURIComponent(name.trim())}`)
+      if (!res.ok) return
+      const all: Item[] = await res.json()
+      setDuplicates(all.filter((i) => i.name.toLowerCase() === name.trim().toLowerCase()))
+    } catch { setDuplicates([]) }
+  }
+
+  async function addPhotoToExisting(target: Item) {
+    const existingPhotos = Array.isArray(target.user_photos) ? target.user_photos : []
+    const newPhotos = boxPhotoUrl ? [...existingPhotos, boxPhotoUrl] : existingPhotos
+    await fetch(`/api/items/${target.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_photos: newPhotos }),
+    })
+    router.push(`/items/${target.id}`)
+  }
 
   function setField(key: keyof EditForm, value: string) {
     setForm((f) => {
@@ -88,6 +111,8 @@ export default function AddItemClient() {
             zustand: data.zustand ?? DEFAULT_CONDITION,
             wert: f.wert || getDefaultWert(data.serie) || '',
           }))
+          setDuplicates([])
+          checkDuplicates(data.name)
         }
       }
 
@@ -162,6 +187,7 @@ export default function AddItemClient() {
   function reset() {
     setStep('upload'); setPreview(null); setForm(emptyForm)
     setError(null); setCoverUrl(null); setCoverOptions([]); setBoxPhotoUrl(null)
+    setDuplicates([])
   }
 
   const dropZoneProps = {
@@ -265,6 +291,58 @@ export default function AddItemClient() {
         {error && (
           <div className="flex items-center gap-2 text-red-400 text-sm bg-red-500/10 rounded-lg p-3">
             <AlertCircle className="w-4 h-4 flex-shrink-0" />{error}
+          </div>
+        )}
+
+        {/* Duplicate warning */}
+        {duplicates.length > 0 && (
+          <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+              <p className="text-amber-300 text-sm font-medium">
+                Dieser Artikel ist bereits {duplicates.length === 1 ? 'einmal' : `${duplicates.length}×`} in der Sammlung vorhanden
+              </p>
+            </div>
+            <p className="text-zinc-500 text-xs">
+              Möchtest du die neuen Fotos dem bestehenden Eintrag hinzufügen, oder soll es als neuer Artikel angelegt werden?
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {duplicates.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => addPhotoToExisting(item)}
+                  disabled={!boxPhotoUrl}
+                  className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 border border-white/10 rounded-lg px-3 py-2 transition-colors text-left"
+                >
+                  {item.cover_url && (
+                    <div className="relative w-8 h-10 rounded overflow-hidden flex-shrink-0">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={item.cover_url} alt={item.name} className="absolute inset-0 w-full h-full object-cover" />
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-xs text-white font-medium">{item.name}</p>
+                    {item.serie && <p className="text-xs text-zinc-500">{item.serie}</p>}
+                    <p className="text-xs text-amber-400">Fotos hinzufügen →</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => setDuplicates([])}
+                className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+              >
+                Trotzdem als neuen Artikel anlegen
+              </button>
+              <button
+                onClick={reset}
+                className="flex items-center gap-1.5 text-xs text-zinc-600 hover:text-red-400 transition-colors"
+              >
+                <Trash2 className="w-3 h-3" />
+                Upload verwerfen
+              </button>
+            </div>
           </div>
         )}
 
