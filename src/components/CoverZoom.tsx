@@ -59,7 +59,7 @@ export default function CoverZoom({ src, alt, sizes = '192px', priority = false,
       {open && createPortal(
         <div
           className="fixed inset-0 z-[9999] bg-black/95 flex items-center justify-center p-4"
-          onClick={(e) => { e.stopPropagation(); setOpen(false) }}
+          onClick={() => setOpen(false)}
           tabIndex={-1}
         >
           {/* Close */}
@@ -82,19 +82,17 @@ export default function CoverZoom({ src, alt, sizes = '192px', priority = false,
             </button>
           )}
 
-          {/* Image */}
+          {/* Image — max-Größen statt fester aspect-ratio, damit es immer in den Viewport passt */}
           <div
-            className="relative w-[min(90vw,100vh)] aspect-[3/4]"
+            className="relative max-w-[90vw] max-h-[90vh] flex items-center justify-center"
             onClick={(e) => e.stopPropagation()}
           >
-            <Image
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
               key={all[index]}
               src={all[index]}
               alt={`${alt} ${index + 1}`}
-              fill
-              className="object-contain rounded-xl"
-              sizes="90vw"
-              priority
+              className="max-w-[90vw] max-h-[90vh] object-contain rounded-xl"
             />
           </div>
 
