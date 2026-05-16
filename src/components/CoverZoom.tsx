@@ -49,7 +49,7 @@ export default function CoverZoom({ src, alt, sizes = '192px', priority = false,
       <div className="absolute inset-0 pointer-events-none">
         <button
           onClick={openLightbox}
-          className="pointer-events-auto absolute top-1.5 right-1.5 p-1 rounded-md bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70"
+          className="pointer-events-auto absolute top-1.5 right-1.5 p-1 rounded-md bg-black/50 text-white opacity-60 hover:opacity-100 group-hover:opacity-100 transition-opacity hover:bg-black/70"
           aria-label="Vergrößern"
         >
           <ZoomIn className="w-3.5 h-3.5" />
