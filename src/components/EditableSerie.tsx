@@ -4,12 +4,13 @@ import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Pencil, Check, X, Loader2 } from 'lucide-react'
 import { SERIES_PRESETS } from '@/lib/seriesPresets'
+import SerieCombobox from './SerieCombobox'
 
 interface Props {
   itemId: string
   initialSerie: string | null
   /** All distinct serie values currently in the DB. Merged with SERIES_PRESETS
-   *  to populate the datalist so user-created series stay reachable. */
+   *  to populate the dropdown so user-created series stay reachable. */
   distinctSeries?: string[]
 }
 
@@ -20,7 +21,6 @@ export default function EditableSerie({ itemId, initialSerie, distinctSeries }: 
   const [saved, setSaved] = useState(initialSerie ?? '')
   const [saving, setSaving] = useState(false)
 
-  // Combine presets with whatever's actually in the DB, dedupe + sort.
   const options = useMemo(() => {
     const set = new Set<string>(SERIES_PRESETS)
     for (const s of distinctSeries ?? []) if (s) set.add(s)
@@ -49,21 +49,15 @@ export default function EditableSerie({ itemId, initialSerie, distinctSeries }: 
   if (editing) {
     return (
       <div className="flex items-center gap-2">
-        <input
-          list="serie-options"
+        <SerieCombobox
           value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') { e.preventDefault(); save() }
-            else if (e.key === 'Escape') { e.preventDefault(); cancel() }
-          }}
+          onChange={setValue}
+          options={options}
           autoFocus
-          placeholder="Serie wählen oder eingeben"
-          className="bg-zinc-800 text-zinc-100 rounded-md px-2 py-1 text-sm outline-none ring-2 ring-yellow-500 min-w-[260px]"
+          onCommit={save}
+          onCancel={cancel}
+          className="min-w-[280px]"
         />
-        <datalist id="serie-options">
-          {options.map((s) => <option key={s} value={s} />)}
-        </datalist>
         <button
           onClick={save}
           disabled={saving}

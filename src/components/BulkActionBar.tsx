@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2, Check, X, ScanSearch, Trash2 } from 'lucide-react'
 import { CONDITION_PRESETS } from '@/lib/conditionPresets'
 import { SERIES_PRESETS } from '@/lib/seriesPresets'
 import BulkRefreshReviewModal, { ProposedData } from '@/components/BulkRefreshReviewModal'
+import SerieCombobox from '@/components/SerieCombobox'
 import { Item } from '@/types/item'
 
 interface Props {
@@ -25,6 +26,14 @@ export default function BulkActionBar({ selectedIds, onClear, items = [] }: Prop
   const router = useRouter()
   const [zustand, setZustand] = useState('')
   const [serie, setSerie] = useState('')
+
+  // Series options: presets ∪ all distinct serie values currently in DB,
+  // so a user-created series stays selectable across the UI.
+  const serieOptions = useMemo(() => {
+    const set = new Set<string>(SERIES_PRESETS)
+    for (const i of items) if (i.serie) set.add(i.serie)
+    return [...set].sort()
+  }, [items])
   const [saving, setSaving] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [refreshProgress, setRefreshProgress] = useState<{ done: number; total: number } | null>(null)
@@ -140,18 +149,15 @@ export default function BulkActionBar({ selectedIds, onClear, items = [] }: Prop
 
       <div className="w-px h-5 bg-white/10" />
 
-      {/* Serie dropdown */}
-      <select
+      {/* Serie combobox */}
+      <SerieCombobox
         value={serie}
-        onChange={(e) => setSerie(e.target.value)}
+        onChange={setSerie}
+        options={serieOptions}
         disabled={busy}
-        className="bg-zinc-800 text-zinc-300 text-sm rounded-lg px-2 py-1.5 outline-none ring-1 ring-white/10 focus:ring-yellow-500 cursor-pointer disabled:opacity-40"
-      >
-        <option value="">— Serie wählen —</option>
-        {SERIES_PRESETS.map((s) => (
-          <option key={s} value={s}>{s}</option>
-        ))}
-      </select>
+        placeholder="— Serie wählen —"
+        className="min-w-[220px]"
+      />
 
       {/* Zustand dropdown */}
       <select
