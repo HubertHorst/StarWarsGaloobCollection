@@ -50,7 +50,13 @@ export default function ItemListView({ items }: Props) {
       .filter((item) => {
         if (filters.name && !item.name.toLowerCase().includes(filters.name.toLowerCase())) return false
         if (filters.zustand && (item.zustand ?? '').toLowerCase() !== filters.zustand.toLowerCase()) return false
-        if (filters.serie && item.serie !== filters.serie) return false
+        if (filters.serie) {
+          if (filters.serie === '__none__') {
+            if (item.serie) return false
+          } else if (item.serie !== filters.serie) {
+            return false
+          }
+        }
         if (filters.jahr) {
           const year = item.jahr ? String(item.jahr) : ''
           if (!year.startsWith(filters.jahr)) return false
@@ -160,7 +166,10 @@ export default function ItemListView({ items }: Props) {
           </div>
           <div className="w-10 flex-shrink-0" />
           <button className={`flex-1 min-w-0 ${headerBtn}`} onClick={() => toggleSort('name')}>
-            Name / Serie <SortIcon field="name" />
+            Name <SortIcon field="name" />
+          </button>
+          <button className={`hidden sm:flex w-44 lg:w-56 flex-shrink-0 ${headerBtn}`} onClick={() => toggleSort('serie')}>
+            Serie <SortIcon field="serie" />
           </button>
           <button className={`flex-shrink-0 ${headerBtn}`} onClick={() => toggleSort('zustand')}>
             Zustand <SortIcon field="zustand" />
@@ -190,22 +199,21 @@ export default function ItemListView({ items }: Props) {
         <div className="hidden sm:flex items-center gap-3 px-4 pb-2">
           <div className="w-5 flex-shrink-0" />
           <div className="w-10 flex-shrink-0" />
-          <div className="flex-1 min-w-0 flex gap-1.5">
-            <input
-              value={filters.name}
-              onChange={(e) => setFilters((f) => ({ ...f, name: e.target.value }))}
-              placeholder="Name suchen…"
-              className={`flex-1 min-w-0 ${filterInput}`}
-            />
-            <select
-              value={filters.serie}
-              onChange={(e) => setFilters((f) => ({ ...f, serie: e.target.value }))}
-              className={`w-auto flex-shrink-0 ${filterSelect}`}
-            >
-              <option value="">Alle Serien</option>
-              {series.map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
+          <input
+            value={filters.name}
+            onChange={(e) => setFilters((f) => ({ ...f, name: e.target.value }))}
+            placeholder="Name suchen…"
+            className={`flex-1 min-w-0 ${filterInput}`}
+          />
+          <select
+            value={filters.serie}
+            onChange={(e) => setFilters((f) => ({ ...f, serie: e.target.value }))}
+            className={`hidden sm:block w-44 lg:w-56 flex-shrink-0 ${filterSelect}`}
+          >
+            <option value="">Alle Serien</option>
+            <option value="__none__">— Ohne Serie</option>
+            {series.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
           <select
             value={filters.zustand}
             onChange={(e) => setFilters((f) => ({ ...f, zustand: e.target.value }))}

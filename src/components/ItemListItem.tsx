@@ -172,9 +172,8 @@ export default function ItemListItem({ item, selected, onToggle }: Props) {
         )}
       </div>
 
-      {/* Col 3 – Name + Serie (flex-1) */}
+      {/* Col 3 – Name (flex-1) */}
       <div className="flex-1 min-w-0">
-        {/* Name */}
         {editing === 'name' ? (
           <span className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
             <input
@@ -201,31 +200,40 @@ export default function ItemListItem({ item, selected, onToggle }: Props) {
           </span>
         )}
 
-        {/* Serie – always full text, no truncation */}
+        {/* Mobile: Serie still inline below name (no separate column on small screens) */}
+        <div className="sm:hidden">
+          <span className="flex items-center gap-1 mt-0.5">
+            <span className="text-xs text-yellow-600/70 truncate">
+              {item.serie ?? '—'}
+            </span>
+          </span>
+        </div>
+      </div>
+
+      {/* Col 4 – Serie (own column on sm+) */}
+      <div className="hidden sm:block w-44 lg:w-56 flex-shrink-0 min-w-0">
         {editing === 'serie' ? (
-          <span className="flex flex-col gap-1 mt-0.5" onClick={(e) => e.stopPropagation()}>
+          <span className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
             <select
               value={fieldValues.serie}
               onChange={(e) => setFieldValues((v) => ({ ...v, serie: e.target.value }))}
-              className="w-full bg-zinc-800 text-zinc-300 rounded px-1.5 py-0.5 text-xs outline-none ring-2 ring-yellow-500 cursor-pointer"
+              className="flex-1 min-w-0 bg-zinc-800 text-zinc-300 rounded px-1.5 py-0.5 text-xs outline-none ring-2 ring-yellow-500 cursor-pointer"
             >
               <option value="">— wählen —</option>
               {SERIES_PRESETS.map((s) => (
                 <option key={s} value={s}>{s}</option>
               ))}
             </select>
-            <span className="flex items-center gap-1">
-              <button onClick={(e) => save('serie', e)} disabled={saving} className="p-0.5 rounded bg-yellow-600 hover:bg-yellow-500 text-white">
-                {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
-              </button>
-              <button onClick={cancel} disabled={saving} className="p-0.5 rounded bg-zinc-700 hover:bg-zinc-600 text-white">
-                <X className="w-3 h-3" />
-              </button>
-            </span>
+            <button onClick={(e) => save('serie', e)} disabled={saving} className="flex-shrink-0 p-0.5 rounded bg-yellow-600 hover:bg-yellow-500 text-white">
+              {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+            </button>
+            <button onClick={cancel} disabled={saving} className="flex-shrink-0 p-0.5 rounded bg-zinc-700 hover:bg-zinc-600 text-white">
+              <X className="w-3 h-3" />
+            </button>
           </span>
         ) : (
-          <span className="flex items-center gap-1 mt-0.5 group/serie">
-            <span className="text-xs text-yellow-600/70 group-hover:text-yellow-500/80 transition-colors">
+          <span className="flex items-center gap-1 group/serie min-w-0">
+            <span className="text-xs text-yellow-600/70 group-hover:text-yellow-500/80 transition-colors truncate">
               {item.serie ?? '—'}
             </span>
             <button onClick={(e) => startEdit('serie', e)} className="flex-shrink-0 opacity-0 group-hover/serie:opacity-100 transition-opacity">
