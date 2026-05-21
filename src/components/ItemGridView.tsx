@@ -14,6 +14,7 @@ import CoverSearchModal, { CoverSearchItem } from '@/components/CoverSearchModal
 interface Props {
   items: Item[]
   editMode?: boolean
+  initialSerie?: string   // pre-select series filter (series detail view)
 }
 
 interface PendingMerge { source: Item; target: Item }
@@ -48,7 +49,7 @@ const SORT_LABELS: Record<SortField, string> = {
 
 const sel = 'bg-zinc-800/70 text-zinc-300 text-xs rounded-lg px-2 py-1.5 outline-none ring-1 ring-white/10 focus:ring-yellow-500 cursor-pointer hover:bg-zinc-700/70 transition-colors'
 
-export default function ItemGridView({ items: initialItems, editMode = false }: Props) {
+export default function ItemGridView({ items: initialItems, editMode = false, initialSerie }: Props) {
   const router = useRouter()
 
   const [selectedIds, setSelectedIds] = useState<string[]>([])
@@ -67,14 +68,20 @@ export default function ItemGridView({ items: initialItems, editMode = false }: 
   })
   const [sort, setSort] = useState<{ field: SortField; dir: SortDir }>({ field: 'name', dir: 'asc' })
 
-  // Restore on mount
+  // Restore on mount; initialSerie (series detail view) overrides persisted serie filter
   useEffect(() => {
     try {
       const f = sessionStorage.getItem('grid-filters')
-      if (f) setFilters(JSON.parse(f))
+      if (f) {
+        const parsed = JSON.parse(f)
+        setFilters(initialSerie !== undefined ? { ...parsed, serie: initialSerie } : parsed)
+      } else if (initialSerie !== undefined) {
+        setFilters((prev) => ({ ...prev, serie: initialSerie }))
+      }
       const s = sessionStorage.getItem('grid-sort')
       if (s) setSort(JSON.parse(s))
     } catch { /* ignore */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Persist whenever state changes

@@ -139,8 +139,9 @@ export default async function LibraryPage({ searchParams }: Props) {
             </Link>
           </div>
         ) : showSerieDetail ? (
-          // Serie detail: always show as grid
-          <ItemGridView items={filteredItems} editMode={editMode} />
+          // Serie detail: pass ALL items so series dropdown is fully populated;
+          // initialSerie pre-selects the current series filter in the toolbar.
+          <ItemGridView items={allItems} editMode={editMode} initialSerie={serieFilter ?? ''} />
         ) : currentView === 'list' ? (
           <ItemListView items={allItems} />
         ) : currentView === 'grid' ? (
