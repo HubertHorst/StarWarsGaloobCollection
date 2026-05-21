@@ -5,6 +5,7 @@ import { getDb, initDb } from '@/lib/db'
 import { safeParseJson } from '@/lib/validate'
 import ItemGridView from '@/components/ItemGridView'
 import ItemListView from '@/components/ItemListView'
+import ItemSeriesView from '@/components/ItemSeriesView'
 import ViewToggle from '@/components/ViewToggle'
 import ChangelogPanel from '@/components/ChangelogPanel'
 import ScrollRestorer from '@/components/ScrollRestorer'
@@ -14,6 +15,8 @@ import { sortItems } from '@/lib/sortItems'
 interface Props {
   searchParams: Promise<{ view?: string; edit?: string }>
 }
+
+type View = 'grid' | 'list' | 'series'
 
 function parseItem(row: Record<string, unknown>): Item {
   return {
@@ -42,7 +45,7 @@ async function getItems(): Promise<Item[]> {
 
 export default async function LibraryPage({ searchParams }: Props) {
   const { view, edit } = await searchParams
-  const currentView = view === 'list' ? 'list' : 'grid'
+  const currentView: View = view === 'list' ? 'list' : view === 'series' ? 'series' : 'grid'
   const editMode = edit === '1' && currentView === 'grid'
   const items = await getItems()
 
@@ -104,6 +107,8 @@ export default async function LibraryPage({ searchParams }: Props) {
           </div>
         ) : currentView === 'list' ? (
           <ItemListView items={items} />
+        ) : currentView === 'series' ? (
+          <ItemSeriesView items={items} />
         ) : (
           <ItemGridView items={items} editMode={editMode} />
         )}
