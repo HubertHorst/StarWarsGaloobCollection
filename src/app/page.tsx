@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Plus, Layers, Star } from 'lucide-react'
+import { Plus, Layers, Star, ChevronLeft } from 'lucide-react'
 import EditModeToggle from '@/components/EditModeToggle'
 import { getDb, initDb } from '@/lib/db'
 import { safeParseJson } from '@/lib/validate'
@@ -13,7 +13,7 @@ import { Item } from '@/types/item'
 import { sortItems } from '@/lib/sortItems'
 
 interface Props {
-  searchParams: Promise<{ view?: string; edit?: string }>
+  searchParams: Promise<{ view?: string; edit?: string; serie?: string }>
 }
 
 type View = 'grid' | 'list' | 'series'
@@ -29,7 +29,6 @@ async function getItems(): Promise<Item[]> {
   await initDb()
   const db = getDb()
 
-  // Sort: serie alpha, then numeric for #N names, then plain alpha
   const sql = `SELECT * FROM items ORDER BY serie ASC,
     CASE
       WHEN INSTR(name, '#') > 0
@@ -44,26 +43,61 @@ async function getItems(): Promise<Item[]> {
 }
 
 export default async function LibraryPage({ searchParams }: Props) {
-  const { view, edit } = await searchParams
-  const currentView: View = view === 'list' ? 'list' : view === 'series' ? 'series' : 'grid'
+  const { view, edit, serie } = await searchParams
+
+  // Serienansicht ist die Landing Page (Standard)
+  const currentView: View = view === 'list' ? 'list' : view === 'grid' ? 'grid' : 'series'
   const editMode = edit === '1' && currentView === 'grid'
-  const items = await getItems()
+
+  const allItems = await getItems()
+
+  // Wenn ?serie= gesetzt, in diese Serie filtern und Grid zeigen
+  const serieFilter = serie ? decodeURIComponent(serie) : null
+  const filteredItems = serieFilter
+    ? serieFilter === '__none__'
+      ? allItems.filter((i) => !i.serie)
+      : allItems.filter((i) => i.serie === serieFilter)
+    : allItems
+
+  const showSerieDetail = !!serieFilter
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
       <header className="sticky top-0 z-10 border-b border-white/5 bg-zinc-900/80 backdrop-blur">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <Star className="w-6 h-6 text-yellow-400 fill-yellow-400" />
-            <h1 className="text-lg font-bold tracking-tight">Star Wars Galoob Collection</h1>
-            <span className="ml-2 text-sm text-zinc-500">
-              {items.length} {items.length === 1 ? 'Artikel' : 'Artikel'}
-            </span>
+          <div className="flex items-center gap-2 min-w-0">
+            {showSerieDetail ? (
+              <>
+                <Link
+                  href="/"
+                  className="flex items-center gap-1 text-zinc-400 hover:text-white transition-colors flex-shrink-0"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  <span className="text-sm hidden sm:inline">Serien</span>
+                </Link>
+                <Star className="w-5 h-5 text-yellow-400 fill-yellow-400 flex-shrink-0" />
+                <h1 className="text-base sm:text-lg font-bold tracking-tight truncate">
+                  {serieFilter === '__none__' ? 'Ohne Serie' : serieFilter}
+                </h1>
+                <span className="ml-1 text-sm text-zinc-500 flex-shrink-0">
+                  {filteredItems.length}
+                </span>
+              </>
+            ) : (
+              <>
+                <Star className="w-6 h-6 text-yellow-400 fill-yellow-400 flex-shrink-0" />
+                <h1 className="text-lg font-bold tracking-tight whitespace-nowrap">Star Wars Galoob Collection</h1>
+                <span className="ml-2 text-sm text-zinc-500 flex-shrink-0">
+                  {allItems.length} Artikel
+                </span>
+              </>
+            )}
           </div>
-          <div className="flex items-center gap-2">
+
+          <div className="flex items-center gap-2 flex-shrink-0">
             <ChangelogPanel />
-            <ViewToggle current={currentView} />
-            {currentView === 'grid' && (
+            {!showSerieDetail && <ViewToggle current={currentView} />}
+            {(showSerieDetail || currentView === 'grid') && (
               <EditModeToggle editMode={editMode} />
             )}
             <Link
@@ -88,14 +122,12 @@ export default async function LibraryPage({ searchParams }: Props) {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
         <ScrollRestorer />
 
-        {items.length === 0 ? (
+        {allItems.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-32 gap-4 text-center">
             <Star className="w-16 h-16 text-zinc-700" />
             <div>
               <p className="text-zinc-400 text-lg font-medium">Deine Sammlung ist leer</p>
-              <p className="text-zinc-600 text-sm mt-1">
-                Füge deinen ersten Artikel hinzu, indem du ein Foto machst
-              </p>
+              <p className="text-zinc-600 text-sm mt-1">Füge deinen ersten Artikel hinzu</p>
             </div>
             <Link
               href="/add"
@@ -105,12 +137,16 @@ export default async function LibraryPage({ searchParams }: Props) {
               Ersten Artikel hinzufügen
             </Link>
           </div>
+        ) : showSerieDetail ? (
+          // Serie detail: always show as grid
+          <ItemGridView items={filteredItems} editMode={editMode} />
         ) : currentView === 'list' ? (
-          <ItemListView items={items} />
-        ) : currentView === 'series' ? (
-          <ItemSeriesView items={items} />
+          <ItemListView items={allItems} />
+        ) : currentView === 'grid' ? (
+          <ItemGridView items={allItems} editMode={editMode} />
         ) : (
-          <ItemGridView items={items} editMode={editMode} />
+          // series = default landing page
+          <ItemSeriesView items={allItems} />
         )}
       </main>
     </div>
