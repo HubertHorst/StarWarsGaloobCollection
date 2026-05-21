@@ -51,7 +51,7 @@ interface BulkEntry {
   recognized: boolean
   // duplicate resolution
   dbDuplicates: Item[]
-  resolution: 'pending' | 'save-new' | 'merge-into' | 'discard'
+  resolution: 'pending' | 'save-new' | 'merge-into' | 'replace-into' | 'discard'
   mergeTarget: Item | null
   // after save
   savedItemId: string | null
@@ -412,10 +412,12 @@ export default function BulkUploadClient() {
           const dupes = all.filter((i) => i.name.toLowerCase() === entry.name.toLowerCase())
           results[entry.id] = {
             dbDuplicates: dupes,
-            resolution:   dupes.length > 0 ? 'pending' : 'save-new',
+            // Jeder Set geht durchs Resolve-Dialog, auch ohne Duplikate.
+            // Der User soll explizit bestätigen bevor irgendwas gespeichert wird.
+            resolution:   'pending',
           }
         } catch {
-          results[entry.id] = { dbDuplicates: [], resolution: 'save-new' }
+          results[entry.id] = { dbDuplicates: [], resolution: 'pending' }
         }
         setCheckProgress((p) => ({ ...p, done: p.done + 1 }))
       })
@@ -428,17 +430,7 @@ export default function BulkUploadClient() {
           : e
       )
     )
-
-    const anyPending = Object.values(results).some((r) => r.resolution === 'pending')
-    if (anyPending) {
-      setPhase('resolve')
-    } else {
-      // use updated entries directly
-      const updated = entriesList.map((e) =>
-        results[e.id] ? { ...e, ...results[e.id] } : e
-      )
-      saveAll(updated)
-    }
+    setPhase('resolve')
   }, [])
 
   // ---------------------------------------------------------------------------
@@ -481,6 +473,30 @@ export default function BulkUploadClient() {
             body:    JSON.stringify({ user_photos: merged }),
           })
           if (!patchRes.ok) throw new Error('Merge fehlgeschlagen')
+          updateEntry(entry.id, { savedItemId: entry.mergeTarget.id })
+        } else if (entry.resolution === 'replace-into' && entry.mergeTarget) {
+          // Replace existing item entirely with the new upload (same id, new
+          // photos + metadata). User-state fields (in_sammlung, lieferung,
+          // wert, kaufpreis) on the existing record stay unless explicitly
+          // re-entered.
+          const coverPhoto = entry.photos[entry.coverPhotoIndex] ?? entry.photos[0]
+          const allUrls    = entry.photos.filter((p) => p.coverUrl).map((p) => p.coverUrl as string)
+          const patchRes   = await fetch(`/api/items/${entry.mergeTarget.id}`, {
+            method:  'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({
+              name:        entry.name,
+              serie:       entry.serie       || null,
+              set_nummer:  entry.set_nummer  || null,
+              jahr:        entry.jahr        ? parseInt(entry.jahr, 10) : null,
+              zustand:     entry.zustand     || null,
+              ...(entry.wert      ? { wert:      entry.wert      } : {}),
+              ...(entry.kaufpreis ? { kaufpreis: entry.kaufpreis } : {}),
+              cover_url:   coverPhoto?.coverUrl ?? null,
+              user_photos: allUrls,
+            }),
+          })
+          if (!patchRes.ok) throw new Error('Ersetzen fehlgeschlagen')
           updateEntry(entry.id, { savedItemId: entry.mergeTarget.id })
         } else if (entry.resolution === 'save-new') {
           const coverPhoto = entry.photos[entry.coverPhotoIndex] ?? entry.photos[0]
@@ -584,7 +600,7 @@ export default function BulkUploadClient() {
   // RESOLVE phase — decision handlers
   // ---------------------------------------------------------------------------
 
-  function resolveEntry(entryId: string, decision: 'save-new' | 'merge-into' | 'discard', target?: Item) {
+  function resolveEntry(entryId: string, decision: 'save-new' | 'merge-into' | 'replace-into' | 'discard', target?: Item) {
     setEntries((prev) => {
       const updated = prev.map((e) =>
         e.id === entryId
@@ -968,7 +984,8 @@ export default function BulkUploadClient() {
             <p className="text-white font-bold text-lg">Import abgeschlossen</p>
             <p className="text-zinc-400 text-sm mt-1">
               {entries.filter((e) => e.savedItemId && e.resolution === 'save-new').length} neu angelegt ·{' '}
-              {entries.filter((e) => e.savedItemId && e.resolution === 'merge-into').length} zusammengeführt ·{' '}
+              {entries.filter((e) => e.savedItemId && e.resolution === 'merge-into').length} ergänzt ·{' '}
+              {entries.filter((e) => e.savedItemId && e.resolution === 'replace-into').length} ersetzt ·{' '}
               {entries.filter((e) => e.resolution === 'discard').length} verworfen
             </p>
           </div>
@@ -997,7 +1014,9 @@ export default function BulkUploadClient() {
           <div className="bg-zinc-900 border border-white/10 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-5">
             <div className="flex items-center gap-2">
               <AlertCircle className="w-5 h-5 text-amber-400 flex-shrink-0" />
-              <h2 className="text-lg font-bold">Artikel bereits vorhanden</h2>
+              <h2 className="text-lg font-bold">
+                {pendingResolve.dbDuplicates.length > 0 ? 'Artikel bereits vorhanden' : 'Set bestätigen'}
+              </h2>
             </div>
 
             {/* New entry preview */}
@@ -1019,57 +1038,94 @@ export default function BulkUploadClient() {
               </div>
             </div>
 
-            <p className="text-zinc-400 text-sm">
-              Dieser Artikel ist bereits in der Sammlung. Fotos einem bestehenden Eintrag hinzufügen, neu anlegen oder verwerfen?
-            </p>
+            {pendingResolve.dbDuplicates.length > 0 ? (
+              <>
+                <p className="text-zinc-400 text-sm">
+                  Dieser Artikel scheint bereits in der Sammlung zu sein. Was soll passieren?
+                </p>
 
-            {/* Existing DB items */}
-            <div className="space-y-2">
-              <p className="text-xs text-zinc-500 uppercase tracking-wide font-medium">Vorhandene Einträge</p>
-              {pendingResolve.dbDuplicates.map((existing) => (
-                <button
-                  key={existing.id}
-                  onClick={() => resolveEntry(pendingResolve.id, 'merge-into', existing)}
-                  className="w-full flex items-center gap-3 bg-zinc-800 hover:bg-zinc-700 border border-white/10 rounded-xl p-3 transition-colors text-left group"
-                >
-                  {existing.cover_url && (
-                    <div className="relative w-10 h-[52px] rounded-lg overflow-hidden flex-shrink-0">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={existing.cover_url} alt={existing.name} className="w-full h-full object-cover" />
+                {/* Existing DB items — pro Eintrag zwei Optionen */}
+                <div className="space-y-2">
+                  <p className="text-xs text-zinc-500 uppercase tracking-wide font-medium">Vorhandene Einträge</p>
+                  {pendingResolve.dbDuplicates.map((existing) => (
+                    <div
+                      key={existing.id}
+                      className="bg-zinc-800/60 border border-white/10 rounded-xl p-3 flex items-center gap-3"
+                    >
+                      {existing.cover_url && (
+                        <div className="relative w-10 h-[52px] rounded-lg overflow-hidden flex-shrink-0">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={existing.cover_url} alt={existing.name} className="w-full h-full object-cover" />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-white font-medium truncate">{existing.name}</p>
+                        {existing.serie && <p className="text-xs text-zinc-500 truncate">{existing.serie}</p>}
+                      </div>
+                      <div className="flex flex-col gap-1 flex-shrink-0">
+                        <button
+                          onClick={() => resolveEntry(pendingResolve.id, 'merge-into', existing)}
+                          title="Fotos zu diesem hinzufügen, vorhandene Daten beibehalten"
+                          className="px-2.5 py-1 rounded-md bg-zinc-700 hover:bg-zinc-600 text-[11px] text-zinc-100 font-medium transition-colors"
+                        >
+                          Ergänzen
+                        </button>
+                        <button
+                          onClick={() => resolveEntry(pendingResolve.id, 'replace-into', existing)}
+                          title="Diesen Eintrag mit neuen Fotos + Daten überschreiben"
+                          className="px-2.5 py-1 rounded-md bg-amber-700/80 hover:bg-amber-600 text-[11px] text-white font-medium transition-colors"
+                        >
+                          Ersetzen
+                        </button>
+                      </div>
                     </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-white font-medium truncate">{existing.name}</p>
-                    {existing.serie && <p className="text-xs text-zinc-500 truncate">{existing.serie}</p>}
-                    <p className="text-xs text-yellow-400 mt-0.5 group-hover:text-yellow-300">
-                      Zu bestehendem hinzufügen →
-                    </p>
-                  </div>
-                </button>
-              ))}
-            </div>
+                  ))}
+                </div>
 
-            <div className="flex gap-2 pt-1">
-              <button
-                onClick={() => resolveEntry(pendingResolve.id, 'save-new')}
-                className="flex-1 py-2.5 rounded-xl bg-yellow-600 hover:bg-yellow-500 text-white text-sm font-medium transition-colors"
-              >
-                Neu anlegen
-              </button>
-              <button
-                onClick={() => resolveEntry(pendingResolve.id, 'discard')}
-                title="Verwerfen"
-                className="px-3 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-red-400 transition-colors"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </div>
+                <div className="border-t border-white/10 pt-3 flex gap-2">
+                  <button
+                    onClick={() => resolveEntry(pendingResolve.id, 'save-new')}
+                    className="flex-1 py-2.5 rounded-xl bg-yellow-600 hover:bg-yellow-500 text-white text-sm font-medium transition-colors"
+                  >
+                    Trotzdem als neues Set anlegen
+                  </button>
+                  <button
+                    onClick={() => resolveEntry(pendingResolve.id, 'discard')}
+                    title="Upload verwerfen"
+                    className="px-3 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-red-400 transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-zinc-400 text-sm">
+                  Kein vergleichbares Set gefunden. Set zur Sammlung hinzufügen?
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => resolveEntry(pendingResolve.id, 'save-new')}
+                    className="flex-1 py-2.5 rounded-xl bg-yellow-600 hover:bg-yellow-500 text-white text-sm font-medium transition-colors"
+                  >
+                    Zur Sammlung hinzufügen
+                  </button>
+                  <button
+                    onClick={() => resolveEntry(pendingResolve.id, 'discard')}
+                    title="Upload verwerfen"
+                    className="px-3 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-red-400 transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </>
+            )}
 
             {/* Remaining indicator */}
             {entries.filter((e) => e.resolution === 'pending').length > 1 && (
               <p className="text-xs text-zinc-500 text-center">
-                {entries.filter((e) => e.resolution === 'pending').length - 1} weitere{' '}
-                {entries.filter((e) => e.resolution === 'pending').length - 1 === 1 ? 'Duplikat' : 'Duplikate'} folgen
+                Noch {entries.filter((e) => e.resolution === 'pending').length - 1}{' '}
+                {entries.filter((e) => e.resolution === 'pending').length - 1 === 1 ? 'Set' : 'Sets'} zu bestätigen
               </p>
             )}
           </div>
