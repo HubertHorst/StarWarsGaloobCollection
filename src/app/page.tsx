@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Plus, Layers, Star, ChevronLeft } from 'lucide-react'
+import { Layers, Star, ChevronLeft } from 'lucide-react'
 import EditModeToggle from '@/components/EditModeToggle'
 import { getDb, initDb } from '@/lib/db'
 import { safeParseJson } from '@/lib/validate'
@@ -9,6 +9,7 @@ import ItemSeriesView from '@/components/ItemSeriesView'
 import ViewToggle from '@/components/ViewToggle'
 import ChangelogPanel from '@/components/ChangelogPanel'
 import ScrollRestorer from '@/components/ScrollRestorer'
+import LibraryStateMemo from '@/components/LibraryStateMemo'
 import { Item } from '@/types/item'
 import { sortItems } from '@/lib/sortItems'
 
@@ -103,17 +104,10 @@ export default async function LibraryPage({ searchParams }: Props) {
             )}
             <Link
               href="/bulk"
-              className="hidden sm:flex items-center gap-2 bg-zinc-700 hover:bg-zinc-600 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-            >
-              <Layers className="w-4 h-4" />
-              Bulk Import
-            </Link>
-            <Link
-              href="/add"
               className="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
             >
-              <Plus className="w-4 h-4" />
-              <span className="hidden sm:inline">Artikel hinzufügen</span>
+              <Layers className="w-4 h-4" />
+              <span className="hidden sm:inline">Set hinzufügen</span>
               <span className="sm:hidden">Neu</span>
             </Link>
           </div>
@@ -122,6 +116,7 @@ export default async function LibraryPage({ searchParams }: Props) {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
         <ScrollRestorer />
+        <LibraryStateMemo />
 
         {allItems.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-32 gap-4 text-center">
@@ -131,11 +126,11 @@ export default async function LibraryPage({ searchParams }: Props) {
               <p className="text-zinc-600 text-sm mt-1">Füge deinen ersten Artikel hinzu</p>
             </div>
             <Link
-              href="/add"
+              href="/bulk"
               className="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-500 text-white text-sm font-medium px-5 py-2.5 rounded-lg transition-colors mt-2"
             >
-              <Plus className="w-4 h-4" />
-              Ersten Artikel hinzufügen
+              <Layers className="w-4 h-4" />
+              Erstes Set hinzufügen
             </Link>
           </div>
         ) : showSerieDetail ? (

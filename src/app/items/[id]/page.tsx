@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Calendar, Hash, Truck, PackageCheck } from 'lucide-react'
+import BackToLibrary from '@/components/BackToLibrary'
 import { getDb } from '@/lib/db'
 import { compareNames } from '@/lib/sortItems'
 import { safeParseJson } from '@/lib/validate'
@@ -71,10 +72,10 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ id:
       <header className="border-b border-white/5 bg-zinc-900/80 backdrop-blur sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Link href="/" className="flex items-center gap-2 text-zinc-400 hover:text-white transition-colors">
+            <BackToLibrary className="flex items-center gap-2 text-zinc-400 hover:text-white transition-colors">
               <ArrowLeft className="w-5 h-5" />
               <span className="text-sm">Sammlung</span>
-            </Link>
+            </BackToLibrary>
             <ItemNavigation
               currentId={item.id}
               fallbackPrev={fallbackPrev}

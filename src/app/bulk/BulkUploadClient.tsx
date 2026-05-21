@@ -241,10 +241,18 @@ export default function BulkUploadClient() {
     setIsAddingFiles(true)
     setConverting(true)
 
+    // Reserve indices synchronously BEFORE any async work, so the order of
+    // entries follows the order in which the user picked/dropped them. If we
+    // increment AFTER `await toImageFile(...)`, fast-converting files (e.g.
+    // small JPEGs) win the race against slow ones (HEIC) and the resulting
+    // index is non-deterministic.
+    const startIdx = uploadIdx.current
+    uploadIdx.current += accepted.length
+
     const newEntries = await Promise.all(
-      accepted.map(async (file): Promise<BulkEntry> => {
+      accepted.map(async (file, position): Promise<BulkEntry> => {
         const imageFile = await toImageFile(file)
-        const idx       = uploadIdx.current++
+        const idx       = startIdx + position
         const photo: BulkPhoto = {
           id:          crypto.randomUUID(),
           uploadIndex: idx,
@@ -624,9 +632,10 @@ export default function BulkUploadClient() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h2 className="text-2xl font-bold mb-1">Bulk Import</h2>
+        <h2 className="text-2xl font-bold mb-1">Set hinzufügen</h2>
         <p className="text-zinc-400 text-sm">
-          Mehrere Fotos auf einmal hochladen. HEIC und MP4 (Live Photos) werden automatisch konvertiert.
+          Mehrere Fotos auf einmal hochladen — werden in der hochgeladenen Reihenfolge aufgelistet.
+          HEIC und MP4 (Live Photos) werden automatisch konvertiert.
         </p>
       </div>
 
