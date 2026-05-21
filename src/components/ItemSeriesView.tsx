@@ -51,7 +51,11 @@ function buildGroups(items: Item[]): SeriesGroup[] {
   })
 }
 
-/** 2×2 photo mosaic */
+/**
+ * 2×2 photo mosaic. Uses object-contain so portrait/square cover photos
+ * are shown in full (with small letterbox bars in dark) instead of being
+ * cropped at top/bottom by object-cover.
+ */
 function Mosaic({ covers, alt }: { covers: string[]; alt: string }) {
   if (covers.length === 0) {
     return (
@@ -60,30 +64,47 @@ function Mosaic({ covers, alt }: { covers: string[]; alt: string }) {
       </div>
     )
   }
+  // Single image fills the tile without cropping
   if (covers.length === 1) {
-    return <img src={covers[0]} alt={alt} className="w-full h-full object-cover" />
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-zinc-950">
+        <img src={covers[0]} alt={alt} className="w-full h-full object-contain" />
+      </div>
+    )
   }
   if (covers.length === 2) {
     return (
       <div className="w-full h-full grid grid-cols-2 gap-px bg-zinc-950">
-        <img src={covers[0]} alt="" className="w-full h-full object-cover" />
-        <img src={covers[1]} alt="" className="w-full h-full object-cover" />
+        <div className="flex items-center justify-center bg-zinc-900 overflow-hidden">
+          <img src={covers[0]} alt="" className="w-full h-full object-contain" />
+        </div>
+        <div className="flex items-center justify-center bg-zinc-900 overflow-hidden">
+          <img src={covers[1]} alt="" className="w-full h-full object-contain" />
+        </div>
       </div>
     )
   }
   if (covers.length === 3) {
     return (
-      <div className="w-full h-full grid grid-cols-2 gap-px bg-zinc-950">
-        <img src={covers[0]} alt="" className="w-full h-full object-cover row-span-2" />
-        <img src={covers[1]} alt="" className="w-full h-full object-cover" />
-        <img src={covers[2]} alt="" className="w-full h-full object-cover" />
+      <div className="w-full h-full grid grid-cols-2 grid-rows-2 gap-px bg-zinc-950">
+        <div className="row-span-2 flex items-center justify-center bg-zinc-900 overflow-hidden">
+          <img src={covers[0]} alt="" className="w-full h-full object-contain" />
+        </div>
+        <div className="flex items-center justify-center bg-zinc-900 overflow-hidden">
+          <img src={covers[1]} alt="" className="w-full h-full object-contain" />
+        </div>
+        <div className="flex items-center justify-center bg-zinc-900 overflow-hidden">
+          <img src={covers[2]} alt="" className="w-full h-full object-contain" />
+        </div>
       </div>
     )
   }
   return (
-    <div className="w-full h-full grid grid-cols-2 gap-px bg-zinc-950">
+    <div className="w-full h-full grid grid-cols-2 grid-rows-2 gap-px bg-zinc-950">
       {covers.slice(0, 4).map((src, i) => (
-        <img key={i} src={src} alt="" className="w-full h-full object-cover" />
+        <div key={i} className="flex items-center justify-center bg-zinc-900 overflow-hidden">
+          <img src={src} alt="" className="w-full h-full object-contain" />
+        </div>
       ))}
     </div>
   )
