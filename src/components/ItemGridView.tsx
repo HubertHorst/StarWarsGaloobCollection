@@ -99,8 +99,20 @@ export default function ItemGridView({ items: initialItems, editMode = false, in
     return initialItems
       .filter((item) => {
         if (filters.name && !item.name.toLowerCase().includes(filters.name.toLowerCase())) return false
-        if (filters.serie && item.serie !== filters.serie) return false
-        if (filters.zustand && (item.zustand ?? '').toLowerCase() !== filters.zustand.toLowerCase()) return false
+        if (filters.serie) {
+          if (filters.serie === '__none__') {
+            if (item.serie) return false
+          } else if (item.serie !== filters.serie) {
+            return false
+          }
+        }
+        if (filters.zustand) {
+          if (filters.zustand === '__none__') {
+            if (item.zustand) return false
+          } else if ((item.zustand ?? '').toLowerCase() !== filters.zustand.toLowerCase()) {
+            return false
+          }
+        }
         if (filters.lieferung !== '' && String(item.lieferung_ausstehend ?? 0) !== filters.lieferung) return false
         if (filters.sammlung !== '' && String(item.in_sammlung ?? 1) !== filters.sammlung) return false
         return true
@@ -193,12 +205,14 @@ export default function ItemGridView({ items: initialItems, editMode = false, in
       {/* Serie */}
       <select value={filters.serie} onChange={(e) => setFilters((f) => ({ ...f, serie: e.target.value }))} className={sel}>
         <option value="">Alle Serien</option>
+        <option value="__none__">— Ohne Serie</option>
         {series.map((s) => <option key={s} value={s}>{s}</option>)}
       </select>
 
       {/* Zustand */}
       <select value={filters.zustand} onChange={(e) => setFilters((f) => ({ ...f, zustand: e.target.value }))} className={sel}>
         <option value="">Alle Zustände</option>
+        <option value="__none__">— Ohne Zustand</option>
         {CONDITION_PRESETS.map((p) => <option key={p} value={p}>{p}</option>)}
       </select>
 
