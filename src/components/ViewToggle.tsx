@@ -11,7 +11,7 @@ export default function ViewToggle({ current }: { current: View }) {
 
   function setView(view: View) {
     const params = new URLSearchParams(searchParams.toString())
-    if (view === 'grid') params.delete('view')
+    if (view === 'series') params.delete('view')   // series is the default — no param needed
     else params.set('view', view)
     router.push(`/?${params.toString()}`)
   }
