@@ -53,6 +53,18 @@ async function getItem(id: string): Promise<Item | null> {
   } as Item
 }
 
+async function getDistinctSeries(): Promise<string[]> {
+  const db = getDb()
+  try {
+    const { rows } = await db.execute(
+      `SELECT DISTINCT serie FROM items WHERE serie IS NOT NULL AND serie != '' ORDER BY serie`
+    )
+    return rows
+      .map((r) => (r as unknown as { serie: string }).serie)
+      .filter((s): s is string => !!s)
+  } catch { return [] }
+}
+
 export default async function ItemDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const item = await getItem(id)
@@ -60,6 +72,7 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ id:
   if (!item) notFound()
 
   const { prev: fallbackPrev, next: fallbackNext } = await getNeighbours(item.id)
+  const distinctSeries = await getDistinctSeries()
 
   const coverUrl = item.cover_url ?? null
   const userPhotos = item.user_photos ?? []
@@ -118,7 +131,7 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ id:
               <EditableTitle itemId={item.id} initialName={item.name} />
               <EditableZustand itemId={item.id} initialZustand={item.zustand} />
               <div className="mt-2">
-                <EditableSerie itemId={item.id} initialSerie={item.serie} />
+                <EditableSerie itemId={item.id} initialSerie={item.serie} distinctSeries={distinctSeries} />
               </div>
               <div className="mt-3">
                 <PriceCheckButton name={item.name} imageUrl={coverUrl} />
