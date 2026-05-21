@@ -209,6 +209,19 @@ export default function BulkUploadClient() {
   // save progress
   const [saveProgress, setSaveProgress] = useState({ done: 0, total: 0 })
 
+  // selection state (review phase: bulk-pick entries for re-recognition)
+  const [selectedForRecog, setSelectedForRecog] = useState<Set<string>>(new Set())
+  const toggleRecogSelect = (id: string) =>
+    setSelectedForRecog((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  const selectUnrecognized = () =>
+    setSelectedForRecog(new Set(entries.filter((e) => !e.recognized).map((e) => e.id)))
+  const selectAll = () => setSelectedForRecog(new Set(entries.map((e) => e.id)))
+  const clearSelection = () => setSelectedForRecog(new Set())
+
   // ---------------------------------------------------------------------------
   // Entry helpers
   // ---------------------------------------------------------------------------
@@ -394,6 +407,7 @@ export default function BulkUploadClient() {
     // pause for manual review — user completes/corrects fields, then
     // clicks "Abgleich starten" to trigger runChecking
     setPhase('review')
+    setSelectedForRecog(new Set())
   }, [])
 
   // ---------------------------------------------------------------------------
@@ -755,11 +769,30 @@ export default function BulkUploadClient() {
                     handleEntryDrop(entry.id)
                   }}
                   className={[
-                    'bg-zinc-900 border rounded-2xl overflow-hidden transition-all duration-150',
+                    'bg-zinc-900 border rounded-2xl overflow-hidden transition-all duration-150 relative',
                     isDraggingThis ? 'opacity-40 scale-95'     : '',
-                    isOver         ? 'ring-4 ring-yellow-500 scale-105 shadow-xl shadow-yellow-500/20' : 'border-white/5',
+                    isOver         ? 'ring-4 ring-yellow-500 scale-105 shadow-xl shadow-yellow-500/20'
+                                   : selectedForRecog.has(entry.id) ? 'border-yellow-500/70' : 'border-white/5',
+                    !entry.recognized && phase === 'review' ? 'ring-1 ring-amber-500/30' : '',
                   ].join(' ')}
                 >
+                  {/* Recognition-select checkbox (only in review phase) */}
+                  {phase === 'review' && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); toggleRecogSelect(entry.id) }}
+                      className={[
+                        'absolute top-1.5 right-1.5 z-20 w-6 h-6 rounded-md flex items-center justify-center transition-all border-2',
+                        selectedForRecog.has(entry.id)
+                          ? 'bg-yellow-500 border-yellow-500 text-black'
+                          : 'bg-zinc-900/70 border-zinc-600 hover:border-yellow-500 text-transparent hover:text-zinc-500',
+                      ].join(' ')}
+                      title={selectedForRecog.has(entry.id) ? 'Markierung entfernen' : 'Für erneute Erkennung markieren'}
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                    </button>
+                  )}
+
                   {/* Photo strip */}
                   <div
                     className="relative flex gap-1 p-1.5 bg-zinc-950 min-h-[80px] items-center"
@@ -914,39 +947,90 @@ export default function BulkUploadClient() {
           )}
 
           {/* Review phase — user completes/corrects fields, then triggers checking */}
-          {phase === 'review' && (
-            <div className="flex flex-col gap-3">
-              <p className="text-sm text-zinc-300 flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 text-yellow-400 flex-shrink-0 mt-0.5" />
-                <span>
-                  Erkennung abgeschlossen. Daten oben bei Bedarf ergänzen oder korrigieren,
-                  dann starte den Abgleich mit der Sammlung.
-                </span>
-              </p>
-              <div className="flex gap-3 flex-wrap">
-                <button
-                  onClick={() => runChecking([...entries])}
-                  className="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-500 text-white font-semibold px-6 py-2.5 rounded-xl transition-colors"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                  Abgleich starten ({entries.length} Set{entries.length === 1 ? '' : 's'})
-                </button>
-                <button
-                  onClick={() => runRecognition([...entries])}
-                  className="flex items-center gap-2 bg-zinc-700 hover:bg-zinc-600 text-white px-5 py-2.5 rounded-xl text-sm transition-colors"
-                >
-                  <Layers className="w-4 h-4" />
-                  Erneut erkennen
-                </button>
-                <button
-                  onClick={() => { setEntries([]); setPhase('drop') }}
-                  className="text-sm text-zinc-500 hover:text-white px-4 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 transition-colors"
-                >
-                  Alle löschen
-                </button>
+          {phase === 'review' && (() => {
+            const unrecognizedCount = entries.filter((e) => !e.recognized).length
+            const selectedCount = selectedForRecog.size
+            const selectedEntries = entries.filter((e) => selectedForRecog.has(e.id))
+            return (
+              <div className="flex flex-col gap-3">
+                <p className="text-sm text-zinc-300 flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-yellow-400 flex-shrink-0 mt-0.5" />
+                  <span>
+                    Erkennung abgeschlossen.
+                    {unrecognizedCount > 0
+                      ? ` ${unrecognizedCount} von ${entries.length} ${unrecognizedCount === 1 ? 'Set ist' : 'Sets sind'} nicht erkannt worden.`
+                      : ` Alle ${entries.length} Sets wurden erkannt.`}
+                    {' '}Daten oben bei Bedarf ergänzen oder korrigieren, dann starte den Abgleich.
+                  </span>
+                </p>
+
+                {/* Selection-Toolbar: nur wenn was zu re-erkennen */}
+                <div className="flex flex-wrap items-center gap-2 px-3 py-2 bg-zinc-900/60 border border-white/5 rounded-lg text-xs">
+                  <span className="text-zinc-400">Auswahl:</span>
+                  <button
+                    onClick={selectUnrecognized}
+                    disabled={unrecognizedCount === 0}
+                    className="px-2 py-1 rounded-md bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed text-zinc-200 transition-colors"
+                  >
+                    Nur nicht erkannte ({unrecognizedCount})
+                  </button>
+                  <button
+                    onClick={selectAll}
+                    className="px-2 py-1 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-200 transition-colors"
+                  >
+                    Alle ({entries.length})
+                  </button>
+                  {selectedCount > 0 && (
+                    <button
+                      onClick={clearSelection}
+                      className="px-2 py-1 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white transition-colors"
+                    >
+                      Auswahl löschen
+                    </button>
+                  )}
+                  <span className="ml-auto text-zinc-500 tabular-nums">
+                    {selectedCount} markiert
+                  </span>
+                </div>
+
+                {/* Aktions-Buttons */}
+                <div className="flex gap-3 flex-wrap">
+                  <button
+                    onClick={() => runChecking([...entries])}
+                    className="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-500 text-white font-semibold px-6 py-2.5 rounded-xl transition-colors"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                    Abgleich starten ({entries.length} Set{entries.length === 1 ? '' : 's'})
+                  </button>
+                  {selectedCount > 0 ? (
+                    <button
+                      onClick={() => runRecognition(selectedEntries)}
+                      className="flex items-center gap-2 bg-zinc-700 hover:bg-zinc-600 text-white px-5 py-2.5 rounded-xl text-sm transition-colors"
+                      title="Claude Vision nur über die markierten Sets erneut laufen lassen"
+                    >
+                      <Layers className="w-4 h-4" />
+                      Markierte erneut erkennen ({selectedCount})
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => runRecognition([...entries])}
+                      className="flex items-center gap-2 bg-zinc-700 hover:bg-zinc-600 text-white px-5 py-2.5 rounded-xl text-sm transition-colors"
+                      title="Claude Vision über alle Sets erneut laufen lassen"
+                    >
+                      <Layers className="w-4 h-4" />
+                      Alle erneut erkennen
+                    </button>
+                  )}
+                  <button
+                    onClick={() => { setEntries([]); setPhase('drop'); clearSelection() }}
+                    className="text-sm text-zinc-500 hover:text-white px-4 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 transition-colors"
+                  >
+                    Alle löschen
+                  </button>
+                </div>
               </div>
-            </div>
-          )}
+            )
+          })()}
 
           {phase === 'upload' && !allUploaded && entries.length > 0 && (
             <p className="text-sm text-zinc-500 flex items-center gap-2">
