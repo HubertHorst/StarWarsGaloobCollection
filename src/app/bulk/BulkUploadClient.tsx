@@ -22,6 +22,7 @@ type Phase =
   | 'drop'          // initial state — drop zone visible
   | 'upload'        // uploading photos to Cloudinary; drag-merge allowed
   | 'recognizing'   // Claude Vision batch identification
+  | 'review'        // user reviews Claude's output, completes/edits fields
   | 'checking'      // automatic duplicate check against DB
   | 'resolve'       // user resolves duplicates one at a time
   | 'saving'        // saving to DB
@@ -147,8 +148,9 @@ function mergeZustand(a: string, b: string): string {
 const STEPS: { phase: Phase; label: string }[] = [
   { phase: 'upload',      label: 'Hochladen' },
   { phase: 'recognizing', label: 'Erkennung' },
-  { phase: 'checking',    label: 'Prüfen' },
-  { phase: 'resolve',     label: 'Auflösen' },
+  { phase: 'review',      label: 'Daten prüfen' },
+  { phase: 'checking',    label: 'Abgleich' },
+  { phase: 'resolve',     label: 'Bestätigen' },
   { phase: 'saving',      label: 'Speichern' },
 ]
 
@@ -389,8 +391,9 @@ export default function BulkUploadClient() {
     }
     await Promise.all(active)
 
-    // auto-proceed to checking
-    runChecking(entriesList)
+    // pause for manual review — user completes/corrects fields, then
+    // clicks "Abgleich starten" to trigger runChecking
+    setPhase('review')
   }, [])
 
   // ---------------------------------------------------------------------------
@@ -708,7 +711,7 @@ export default function BulkUploadClient() {
       )}
 
       {/* Upload phase — entry cards */}
-      {(phase === 'upload' || phase === 'recognizing') && entries.length > 0 && (
+      {(phase === 'upload' || phase === 'recognizing' || phase === 'review') && entries.length > 0 && (
         <>
           {/* Merge hint */}
           {entries.length >= 2 && phase === 'upload' && (
@@ -896,7 +899,7 @@ export default function BulkUploadClient() {
                 Bilder erkennen ({entries.length} Artikel)
               </button>
               <button
-                onClick={() => runChecking([...entries])}
+                onClick={() => setPhase('review')}
                 className="flex items-center gap-2 bg-zinc-700 hover:bg-zinc-600 text-white px-5 py-2.5 rounded-xl text-sm transition-colors"
               >
                 Ohne Erkennung weiter
@@ -907,6 +910,41 @@ export default function BulkUploadClient() {
               >
                 Alle löschen
               </button>
+            </div>
+          )}
+
+          {/* Review phase — user completes/corrects fields, then triggers checking */}
+          {phase === 'review' && (
+            <div className="flex flex-col gap-3">
+              <p className="text-sm text-zinc-300 flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-yellow-400 flex-shrink-0 mt-0.5" />
+                <span>
+                  Erkennung abgeschlossen. Daten oben bei Bedarf ergänzen oder korrigieren,
+                  dann starte den Abgleich mit der Sammlung.
+                </span>
+              </p>
+              <div className="flex gap-3 flex-wrap">
+                <button
+                  onClick={() => runChecking([...entries])}
+                  className="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-500 text-white font-semibold px-6 py-2.5 rounded-xl transition-colors"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                  Abgleich starten ({entries.length} Set{entries.length === 1 ? '' : 's'})
+                </button>
+                <button
+                  onClick={() => runRecognition([...entries])}
+                  className="flex items-center gap-2 bg-zinc-700 hover:bg-zinc-600 text-white px-5 py-2.5 rounded-xl text-sm transition-colors"
+                >
+                  <Layers className="w-4 h-4" />
+                  Erneut erkennen
+                </button>
+                <button
+                  onClick={() => { setEntries([]); setPhase('drop') }}
+                  className="text-sm text-zinc-500 hover:text-white px-4 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 transition-colors"
+                >
+                  Alle löschen
+                </button>
+              </div>
             </div>
           )}
 
