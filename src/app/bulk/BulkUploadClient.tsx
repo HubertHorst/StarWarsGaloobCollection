@@ -419,26 +419,57 @@ export default function BulkUploadClient() {
     const total = entriesList.length
     setCheckProgress({ done: 0, total })
 
+    // Fetch ALL items once. Fuzzy-match each entry against them via
+    // word-overlap (Jaccard) on stop-word-stripped names. This catches
+    // pairs like
+    //   "11-piece Gift set - no exclusives"
+    //   "Star Wars 11 Piece Collector's Gift Set"
+    // that exact-match (or LIKE %name%) misses.
+    let allItems: Item[] = []
+    try {
+      const res = await fetch('/api/items')
+      allItems = res.ok ? await res.json() : []
+    } catch { allItems = [] }
+
     const results: Record<string, { dbDuplicates: Item[]; resolution: BulkEntry['resolution'] }> = {}
 
-    await Promise.all(
-      entriesList.map(async (entry) => {
-        try {
-          const res = await fetch(`/api/items?q=${encodeURIComponent(entry.name)}`)
-          const all: Item[] = res.ok ? await res.json() : []
-          const dupes = all.filter((i) => i.name.toLowerCase() === entry.name.toLowerCase())
-          results[entry.id] = {
-            dbDuplicates: dupes,
-            // Jeder Set geht durchs Resolve-Dialog, auch ohne Duplikate.
-            // Der User soll explizit bestätigen bevor irgendwas gespeichert wird.
-            resolution:   'pending',
-          }
-        } catch {
-          results[entry.id] = { dbDuplicates: [], resolution: 'pending' }
-        }
-        setCheckProgress((p) => ({ ...p, done: p.done + 1 }))
-      })
+    const STOP = new Set([
+      'star', 'wars', 'the', 'and', 'a', 'an', 'no', 'with',
+      'und', 'der', 'die', 'das', 'mit', 'von', 'fur', 'für',
+      'ein', 'eine', 'einer', 'einen',
+      'set', 'edition', 'collection', 'collections',
+    ])
+    const normalize = (s: string) => s.toLowerCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/[:\-–.&,!?'"()/+]/g, ' ')
+      .replace(/\s+/g, ' ').trim()
+    const wordsOf = (s: string): Set<string> => new Set(
+      normalize(s).split(/\s+/).filter((w) => w.length >= 2 && !STOP.has(w))
     )
+    const similarity = (a: string, b: string): number => {
+      if (a.toLowerCase().trim() === b.toLowerCase().trim()) return 1
+      const wa = wordsOf(a)
+      const wb = wordsOf(b)
+      if (wa.size === 0 || wb.size === 0) return 0
+      let common = 0
+      for (const w of wa) if (wb.has(w)) common++
+      const union = new Set([...wa, ...wb]).size
+      return common / union
+    }
+
+    for (const entry of entriesList) {
+      // Compute similarity to every existing item, keep top candidates
+      const scored = allItems
+        .map((i) => ({ item: i, s: similarity(entry.name, i.name) }))
+        .filter((c) => c.s >= 0.4)
+        .sort((a, b) => b.s - a.s)
+        .slice(0, 6)
+      results[entry.id] = {
+        dbDuplicates: scored.map((c) => c.item),
+        resolution:   'pending', // immer manuelle Bestätigung
+      }
+      setCheckProgress((p) => ({ ...p, done: p.done + 1 }))
+    }
 
     setEntries((prev) =>
       prev.map((e) =>
