@@ -63,14 +63,21 @@ export async function POST(req: NextRequest) {
 
 Return ONLY a valid JSON object with these exact fields:
 {
-  "name": "exact item name as printed on the box",
+  "name": "item name — see naming rules below",
   "serie": one of ["Action Fleet : Classic Vessel","Action Fleet : Alpha Series","Action Fleet : Transforming Playsets","Action Fleet : Sonderserie","Action Fleet : Battle Packs","Hasbro Saga Action Fleet 2002 : Vessel","Hasbro Saga Action Fleet 2002 : Battle Packs","Micro Machines : Playsets","Micro Machines : Transforming Action Sets","Micro Machines : Mini Figures","Micro Machines : Original 3 Pack Filme","Micro Machines : Original 3 Pack","Micro Machines : Mini Heads","Micro Machines : Gift Sets"] or null,
   "set_nummer": "set number if visible (e.g. '#7', '67076') or null",
   "jahr": year_as_integer_or_null,
   "zustand": one of ["Neu in Box","Box Neuwertig","Box mit Gebrauchspuren","Box Beschädigt"] or null
 }
 
-Use null for any field you cannot determine. Be precise with the name — copy it exactly as printed.`,
+NAMING RULES — the name field must follow these series-specific formats exactly:
+• "Action Fleet : Battle Packs"           → "Battle Packs #N – Subtitle"          e.g. "Battle Packs #7 – Droid Escape"
+• "Micro Machines : Original 3 Pack"      → "Original 3 Pack #N – Vehicle1, Vehicle2, Vehicle3"  e.g. "Original 3 Pack #3 – X-Wing Starfighter, Darth Vader's TIE Fighter, Y-Wing Starfighter"
+• "Micro Machines : Original 3 Pack Filme"→ "3 Pack Filme #N – Film/Subtitle"     e.g. "3 Pack Filme #11 – Bespin Cloud City, Mon Calamari Rebel Cruiser, Escape Pod"
+• All other series: use the exact product name as printed on the box.
+
+For the #N series: find the set number from the box (printed near the title, on the spine, or near the barcode). Use Arabic numerals.
+Use null for any field you cannot determine.`,
           },
         ],
       }],

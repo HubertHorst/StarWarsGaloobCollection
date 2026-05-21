@@ -29,7 +29,22 @@ export async function POST(req: NextRequest) {
             },
             {
               type: 'text',
-              text: 'Look at this image and identify the Star Wars Galoob collectible item. Return JSON with these exact fields: { "name": "item name", "serie": one of ["Action Fleet : Classic Vessel","Action Fleet : Alpha Series","Action Fleet : Transforming Playsets","Action Fleet : Sonderserie","Action Fleet : Battle Packs","Hasbro Saga Action Fleet 2002 : Vessel","Hasbro Saga Action Fleet 2002 : Battle Packs","Micro Machines : Playsets","Micro Machines : Transforming Action Sets","Micro Machines : Mini Figures","Micro Machines : Original 3 Pack Filme","Micro Machines : Original 3 Pack","Micro Machines : Mini Heads","Micro Machines : Gift Sets"] or null, "set_nummer": "set number if visible or null", "jahr": year_as_number_or_null, "zustand": "Neu in Box|Box Neuwertig|Box mit Gebrauchspuren|Box Beschädigt" }. If you cannot identify the item, return { "name": null, "serie": null, "set_nummer": null, "jahr": null, "zustand": null }.',
+              text: `Look at this image and identify the Star Wars Galoob collectible item. Return ONLY a valid JSON object with these exact fields:
+{
+  "name": "item name — see naming rules below",
+  "serie": one of ["Action Fleet : Classic Vessel","Action Fleet : Alpha Series","Action Fleet : Transforming Playsets","Action Fleet : Sonderserie","Action Fleet : Battle Packs","Hasbro Saga Action Fleet 2002 : Vessel","Hasbro Saga Action Fleet 2002 : Battle Packs","Micro Machines : Playsets","Micro Machines : Transforming Action Sets","Micro Machines : Mini Figures","Micro Machines : Original 3 Pack Filme","Micro Machines : Original 3 Pack","Micro Machines : Mini Heads","Micro Machines : Gift Sets"] or null,
+  "set_nummer": "set number if visible or null",
+  "jahr": year_as_number_or_null,
+  "zustand": one of ["Neu in Box","Box Neuwertig","Box mit Gebrauchspuren","Box Beschädigt"] or null
+}
+
+NAMING RULES — the name field must follow these series-specific formats exactly:
+• "Action Fleet : Battle Packs"           → "Battle Packs #N – Subtitle"          e.g. "Battle Packs #7 – Droid Escape"
+• "Micro Machines : Original 3 Pack"      → "Original 3 Pack #N – Vehicle1, Vehicle2, Vehicle3"
+• "Micro Machines : Original 3 Pack Filme"→ "3 Pack Filme #N – Film/Subtitle"     e.g. "3 Pack Filme #1 – Millennium Falcon, Imperial Star Destroyer, X-wing Starfighter"
+• All other series: use the exact product name as printed on the box.
+
+For the #N series: find the set number from the box. Use Arabic numerals. If you cannot identify the item, return all fields as null.`,
             },
           ],
         },
