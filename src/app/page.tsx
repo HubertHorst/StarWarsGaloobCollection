@@ -47,7 +47,8 @@ export default async function LibraryPage({ searchParams }: Props) {
 
   // Serienansicht ist die Landing Page (Standard)
   const currentView: View = view === 'list' ? 'list' : view === 'grid' ? 'grid' : 'series'
-  const editMode = edit === '1' && currentView === 'grid'
+  // editMode is active in grid view OR in a series detail view (which always renders as grid)
+  const editMode = edit === '1' && (currentView === 'grid' || !!serie)
 
   const allItems = await getItems()
 
