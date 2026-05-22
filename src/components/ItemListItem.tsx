@@ -21,9 +21,9 @@ interface Props {
 }
 
 export default function ItemListItem({ item, selected, onToggle, widths = DEFAULT_COL_WIDTHS }: Props) {
-  // Style helpers — match the header / filter-row layout exactly
-  const fixed   = (key: keyof ColWidths): React.CSSProperties => ({ width: widths[key], minWidth: widths[key], flexShrink: 0 })
-  const growing = (key: keyof ColWidths): React.CSSProperties => ({ minWidth: widths[key], flexGrow: 1, flexShrink: 0 })
+  // Style helper — every column is explicit-width and non-shrinking, so
+  // header/filter/row cells line up exactly.
+  const fixed = (key: keyof ColWidths): React.CSSProperties => ({ width: widths[key], minWidth: widths[key], flexShrink: 0 })
   const router = useRouter()
   const [editing, setEditing] = useState<EditingField>(null)
   const [fieldValues, setFieldValues] = useState({
@@ -178,8 +178,8 @@ export default function ItemListItem({ item, selected, onToggle, widths = DEFAUL
         )}
       </div>
 
-      {/* Col 3 – Name (grows) */}
-      <div className="min-w-0" style={growing('name')}>
+      {/* Col 3 – Name */}
+      <div className="min-w-0" style={fixed('name')}>
         {editing === 'name' ? (
           <span className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
             <input
@@ -193,13 +193,13 @@ export default function ItemListItem({ item, selected, onToggle, widths = DEFAUL
             {saveBtns}
           </span>
         ) : (
-          <span className="flex items-center gap-1 min-w-0">
-            <p className="text-sm font-medium text-white truncate group-hover:text-yellow-300 transition-colors">
+          <span className="flex items-start gap-1 min-w-0">
+            <p className="text-sm font-medium text-white break-words group-hover:text-yellow-300 transition-colors min-w-0">
               {item.name}
             </p>
             <button
               onClick={(e) => startEdit('name', e)}
-              className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+              className="flex-shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
             >
               <Pencil className="w-3 h-3 text-zinc-600 hover:text-zinc-400" />
             </button>
@@ -238,11 +238,11 @@ export default function ItemListItem({ item, selected, onToggle, widths = DEFAUL
             </button>
           </span>
         ) : (
-          <span className="flex items-center gap-1 group/serie min-w-0">
-            <span className="text-xs text-yellow-600/70 group-hover:text-yellow-500/80 transition-colors truncate">
+          <span className="flex items-start gap-1 group/serie min-w-0">
+            <span className="text-xs text-yellow-600/70 group-hover:text-yellow-500/80 transition-colors break-words min-w-0">
               {item.serie ?? '—'}
             </span>
-            <button onClick={(e) => startEdit('serie', e)} className="flex-shrink-0 opacity-0 group-hover/serie:opacity-100 transition-opacity">
+            <button onClick={(e) => startEdit('serie', e)} className="flex-shrink-0 mt-0.5 opacity-0 group-hover/serie:opacity-100 transition-opacity">
               <Pencil className="w-3 h-3 text-zinc-600 hover:text-zinc-400" />
             </button>
           </span>

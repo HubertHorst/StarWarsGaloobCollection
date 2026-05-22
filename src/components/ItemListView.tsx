@@ -72,12 +72,12 @@ export default function ItemListView({ items }: Props) {
     document.addEventListener('mouseup', up)
   }
 
-  // Style helpers — fixed column gets explicit width; the 'name' column grows
-  function colStyle(key: keyof ColWidths, grow = false): React.CSSProperties {
+  // Style helper — every column is explicit-width and non-shrinking, so
+  // header/filter/row cells line up exactly. Name uses the same model and
+  // wraps to multiple lines when content exceeds the chosen width.
+  function colStyle(key: keyof ColWidths): React.CSSProperties {
     const w = widths[key]
-    return grow
-      ? { minWidth: w, flexGrow: 1, flexShrink: 0 }
-      : { width: w,    minWidth: w, flexShrink: 0 }
+    return { width: w, minWidth: w, flexShrink: 0 }
   }
 
   function ResizeHandle({ colKey }: { colKey: keyof ColWidths }) {
@@ -218,7 +218,7 @@ export default function ItemListView({ items }: Props) {
             </button>
           </div>
           <div style={colStyle('thumb')} />
-          <div className="relative" style={colStyle('name', true)}>
+          <div className="relative" style={colStyle('name')}>
             <button className={`w-full ${headerBtn}`} onClick={() => toggleSort('name')}>
               Name <SortIcon field="name" />
             </button>
@@ -282,7 +282,7 @@ export default function ItemListView({ items }: Props) {
             value={filters.name}
             onChange={(e) => setFilters((f) => ({ ...f, name: e.target.value }))}
             placeholder="Name suchen…"
-            style={colStyle('name', true)}
+            style={colStyle('name')}
             className={`${filterInput}`}
           />
           <select
