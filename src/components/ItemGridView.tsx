@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { Item } from '@/types/item'
@@ -19,7 +19,7 @@ interface Props {
 
 interface PendingMerge { source: Item; target: Item }
 
-type SortField = 'name' | 'serie' | 'jahr' | 'wert' | 'kaufpreis' | 'lieferung_ausstehend' | 'in_sammlung'
+type SortField = 'name' | 'serie' | 'jahr' | 'wert' | 'kaufpreis' | 'lieferung_ausstehend' | 'in_sammlung' | 'manual'
 type SortDir = 'asc' | 'desc'
 
 function parseValue(v: string | null): number {
@@ -45,7 +45,10 @@ const SORT_LABELS: Record<SortField, string> = {
   kaufpreis:            'Kaufpreis',
   lieferung_ausstehend: 'Lieferung',
   in_sammlung:          'Sammlung',
+  manual:               'Manuell',
 }
+
+const MANUAL_ORDER_KEY = 'galoob-grid-manual-order'
 
 const sel = 'bg-zinc-800/70 text-zinc-300 text-xs rounded-lg px-2 py-1.5 outline-none ring-1 ring-white/10 focus:ring-yellow-500 cursor-pointer hover:bg-zinc-700/70 transition-colors'
 
@@ -68,6 +71,10 @@ export default function ItemGridView({ items: initialItems, editMode = false, in
   })
   const [sort, setSort] = useState<{ field: SortField; dir: SortDir }>({ field: 'name', dir: 'asc' })
 
+  // Manual drag-to-reorder state (persisted in localStorage as array of IDs)
+  const [manualOrder, setManualOrder] = useState<string[]>([])
+  const manualRestoredRef = useRef(false)
+
   // Restore on mount; initialSerie (series detail view) overrides persisted serie filter
   useEffect(() => {
     try {
@@ -80,7 +87,10 @@ export default function ItemGridView({ items: initialItems, editMode = false, in
       }
       const s = sessionStorage.getItem('grid-sort')
       if (s) setSort(JSON.parse(s))
+      const m = localStorage.getItem(MANUAL_ORDER_KEY)
+      if (m) setManualOrder(JSON.parse(m))
     } catch { /* ignore */ }
+    manualRestoredRef.current = true
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -92,6 +102,39 @@ export default function ItemGridView({ items: initialItems, editMode = false, in
   useEffect(() => {
     sessionStorage.setItem('grid-sort', JSON.stringify(sort))
   }, [sort])
+
+  useEffect(() => {
+    if (!manualRestoredRef.current) return
+    try { localStorage.setItem(MANUAL_ORDER_KEY, JSON.stringify(manualOrder)) } catch {}
+  }, [manualOrder])
+
+  function manualPos(id: string): number {
+    if (manualOrder.length === 0) return Number.MAX_SAFE_INTEGER
+    const i = manualOrder.indexOf(id)
+    return i === -1 ? Number.MAX_SAFE_INTEGER : i
+  }
+
+  /** Move srcId to the position immediately before targetId, keeping the
+   *  rest of the order intact. Initialises manualOrder from current items
+   *  if it's still empty (first manual move ever). */
+  function reorderManual(srcId: string, targetId: string) {
+    if (srcId === targetId) return
+    const base = manualOrder.length > 0
+      ? [...manualOrder]
+      : initialItems.map((i) => i.id)
+    if (!base.includes(srcId)) base.push(srcId)
+    if (!base.includes(targetId)) base.push(targetId)
+    const srcIdx = base.indexOf(srcId)
+    base.splice(srcIdx, 1)
+    const tIdx = base.indexOf(targetId)
+    base.splice(tIdx, 0, srcId)
+    setManualOrder(base)
+  }
+
+  function resetManualOrder() {
+    setManualOrder([])
+    try { localStorage.removeItem(MANUAL_ORDER_KEY) } catch {}
+  }
 
   const hasFilters = filters.name || filters.serie || filters.zustand || filters.lieferung || filters.sammlung
 
@@ -130,10 +173,14 @@ export default function ItemGridView({ items: initialItems, editMode = false, in
           case 'kaufpreis':            return dir * (parseValue(a.kaufpreis) - parseValue(b.kaufpreis))
           case 'lieferung_ausstehend': return dir * ((a.lieferung_ausstehend ?? 0) - (b.lieferung_ausstehend ?? 0))
           case 'in_sammlung':          return dir * ((a.in_sammlung ?? 1) - (b.in_sammlung ?? 1))
+          case 'manual': {
+            const m = manualPos(a.id) - manualPos(b.id)
+            return m !== 0 ? dir * m : compareNames(a.name, b.name)
+          }
           default:                     return 0
         }
       })
-  }, [initialItems, filters, sort])
+  }, [initialItems, filters, sort, manualOrder])
 
   // Derive unique series list from actual items
   const series = useMemo(
@@ -273,11 +320,62 @@ export default function ItemGridView({ items: initialItems, editMode = false, in
 
   // ── Normal (non-edit) mode ─────────────────────────────────────────────────
   if (!editMode) {
+    const manualMode = sort.field === 'manual'
     return (
       <>
         {toolbar}
+        {manualMode && (
+          <div className="mb-3 flex flex-wrap items-center gap-3 px-3 py-2 bg-indigo-500/10 border border-indigo-500/20 rounded-lg text-xs text-indigo-200">
+            <Merge className="w-3.5 h-3.5 text-indigo-300" />
+            <span>Manuelle Reihenfolge — zieh Kacheln per Drag&amp;Drop um neu zu sortieren. Wird im Browser gespeichert.</span>
+            {manualOrder.length > 0 && (
+              <button
+                onClick={resetManualOrder}
+                className="ml-auto px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors"
+                title="Manuelle Reihenfolge verwerfen"
+              >
+                Zurücksetzen
+              </button>
+            )}
+          </div>
+        )}
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-          {filtered.map((item) => <ItemCard key={item.id} item={item} />)}
+          {filtered.map((item) => {
+            if (!manualMode) return <ItemCard key={item.id} item={item} />
+            const isDragging = dragId === item.id
+            const isOver = overId === item.id && dragId !== item.id
+            return (
+              <div
+                key={item.id}
+                draggable
+                onDragStart={(e) => {
+                  // Don't start drag if user grabs an interactive element
+                  const el = e.target as HTMLElement
+                  if (el.closest('input, select, textarea, button')) {
+                    e.preventDefault(); return
+                  }
+                  setDragId(item.id)
+                  e.dataTransfer.effectAllowed = 'move'
+                }}
+                onDragEnd={() => { setDragId(null); setOverId(null) }}
+                onDragOver={(e) => { e.preventDefault(); if (item.id !== dragId) setOverId(item.id) }}
+                onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setOverId(null) }}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  setOverId(null)
+                  if (dragId && dragId !== item.id) reorderManual(dragId, item.id)
+                  setDragId(null)
+                }}
+                className={[
+                  'rounded-xl cursor-grab active:cursor-grabbing transition-all duration-150 select-none',
+                  isDragging ? 'opacity-40 scale-95' : '',
+                  isOver     ? 'ring-2 ring-indigo-400 ring-offset-2 ring-offset-zinc-950 scale-[1.02]' : '',
+                ].join(' ')}
+              >
+                <ItemCard item={item} />
+              </div>
+            )
+          })}
         </div>
         {filtered.length === 0 && (
           <p className="text-center text-zinc-600 text-sm py-16">Keine Artikel gefunden</p>
