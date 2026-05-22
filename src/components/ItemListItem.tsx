@@ -8,6 +8,7 @@ import RefreshFromImageButton from '@/components/RefreshFromImageButton'
 import CoverZoom from '@/components/CoverZoom'
 import { CONDITION_PRESETS } from '@/lib/conditionPresets'
 import { SERIES_PRESETS } from '@/lib/seriesPresets'
+import { ColWidths, DEFAULT_COL_WIDTHS } from '@/lib/itemListColumns'
 
 type EditingField = 'name' | 'zustand' | 'serie' | 'wert' | 'kaufpreis' | null
 
@@ -15,9 +16,14 @@ interface Props {
   item: Item
   selected?: boolean
   onToggle?: () => void
+  /** Column widths from ItemListView. Falls back to defaults if missing. */
+  widths?: ColWidths
 }
 
-export default function ItemListItem({ item, selected, onToggle }: Props) {
+export default function ItemListItem({ item, selected, onToggle, widths = DEFAULT_COL_WIDTHS }: Props) {
+  // Style helpers — match the header / filter-row layout exactly
+  const fixed   = (key: keyof ColWidths): React.CSSProperties => ({ width: widths[key], minWidth: widths[key], flexShrink: 0 })
+  const growing = (key: keyof ColWidths): React.CSSProperties => ({ minWidth: widths[key], flexGrow: 1, flexShrink: 0 })
   const router = useRouter()
   const [editing, setEditing] = useState<EditingField>(null)
   const [fieldValues, setFieldValues] = useState({
@@ -146,8 +152,8 @@ export default function ItemListItem({ item, selected, onToggle }: Props) {
       onClick={handleRowClick}
       className="group flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-zinc-800/70 transition-colors border border-transparent hover:border-white/5 cursor-pointer"
     >
-      {/* Col 1 – Checkbox (w-5) */}
-      <div className="w-5 flex-shrink-0 flex items-center justify-center">
+      {/* Col 1 – Checkbox */}
+      <div className="flex items-center justify-center" style={fixed('checkbox')}>
         {onToggle && (
           <button
             onClick={(e) => { e.stopPropagation(); onToggle() }}
@@ -158,8 +164,8 @@ export default function ItemListItem({ item, selected, onToggle }: Props) {
         )}
       </div>
 
-      {/* Col 2 – Thumbnail (w-10) */}
-      <div className="relative w-10 aspect-[3/4] rounded-lg overflow-hidden bg-zinc-800 flex-shrink-0 ring-1 ring-white/10">
+      {/* Col 2 – Thumbnail */}
+      <div className="relative aspect-[3/4] rounded-lg overflow-hidden bg-zinc-800 ring-1 ring-white/10" style={fixed('thumb')}>
         {coverUrl ? (
           <CoverZoom
             src={coverUrl}
@@ -172,8 +178,8 @@ export default function ItemListItem({ item, selected, onToggle }: Props) {
         )}
       </div>
 
-      {/* Col 3 – Name (flex-1) */}
-      <div className="flex-1 min-w-0">
+      {/* Col 3 – Name (grows) */}
+      <div className="min-w-0" style={growing('name')}>
         {editing === 'name' ? (
           <span className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
             <input
@@ -211,7 +217,7 @@ export default function ItemListItem({ item, selected, onToggle }: Props) {
       </div>
 
       {/* Col 4 – Serie (own column on sm+) */}
-      <div className="hidden sm:block w-44 lg:w-56 flex-shrink-0 min-w-0">
+      <div className="hidden sm:block min-w-0" style={fixed('serie')}>
         {editing === 'serie' ? (
           <span className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
             <select
@@ -243,8 +249,8 @@ export default function ItemListItem({ item, selected, onToggle }: Props) {
         )}
       </div>
 
-      {/* Col 4 – Zustand (sm+) */}
-      <div className="hidden sm:block flex-shrink-0">
+      {/* Col 5 – Zustand (sm+) */}
+      <div className="hidden sm:block min-w-0" style={fixed('zustand')}>
         {editing === 'zustand' ? (
           <span className="flex flex-col gap-1" onClick={(e) => e.stopPropagation()}>
             <select
@@ -285,18 +291,18 @@ export default function ItemListItem({ item, selected, onToggle }: Props) {
         )}
       </div>
 
-      {/* Col 5 – Jahr (w-12, sm+) */}
-      <div className="hidden sm:block w-12 flex-shrink-0 text-xs text-zinc-500 text-right">
+      {/* Col 6 – Jahr */}
+      <div className="hidden sm:block text-xs text-zinc-500 text-right" style={fixed('jahr')}>
         {item.jahr ?? ''}
       </div>
 
-      {/* Col 6 – Set Nr (w-16, md+) */}
-      <div className="hidden md:block w-16 flex-shrink-0 text-xs text-zinc-500 text-right truncate">
+      {/* Col 7 – Set Nr */}
+      <div className="hidden sm:block text-xs text-zinc-500 text-right truncate" style={fixed('setnr')}>
         {item.set_nummer ?? ''}
       </div>
 
-      {/* Col 7 – Lieferung (w-10, sm+) */}
-      <div className="hidden sm:flex w-10 flex-shrink-0 items-center justify-center">
+      {/* Col 8 – Lieferung */}
+      <div className="hidden sm:flex items-center justify-center" style={fixed('lief')}>
         <button
           onClick={toggleLieferung}
           title={item.lieferung_ausstehend === 1 ? 'Lieferung ausstehend' : 'Lieferung erhalten'}
@@ -310,8 +316,8 @@ export default function ItemListItem({ item, selected, onToggle }: Props) {
         </button>
       </div>
 
-      {/* Col 8 – In Sammlung (w-8, sm+) */}
-      <div className="hidden sm:flex w-8 flex-shrink-0 items-center justify-center">
+      {/* Col 9 – In Sammlung */}
+      <div className="hidden sm:flex items-center justify-center" style={fixed('sammlung')}>
         <button
           onClick={toggleSammlung}
           title={item.in_sammlung === 0 ? 'Fehlt in Sammlung' : 'In Sammlung vorhanden'}
@@ -327,13 +333,13 @@ export default function ItemListItem({ item, selected, onToggle }: Props) {
         </button>
       </div>
 
-      {/* Col 9 – Refresh button (w-8, sm+) */}
-      <div className="hidden sm:flex w-8 flex-shrink-0 items-center">
+      {/* Col 10 – Refresh button */}
+      <div className="hidden sm:flex items-center" style={fixed('actions')}>
         <RefreshFromImageButton itemId={item.id} compact />
       </div>
 
-      {/* Col 10 – Kaufpreis (w-20, lg+) */}
-      <div className="hidden lg:flex w-20 flex-shrink-0 items-center justify-end">
+      {/* Col 11 – Kaufpreis */}
+      <div className="hidden sm:flex items-center justify-end" style={fixed('kauf')}>
         {editing === 'kaufpreis' ? (
           <span className="flex items-center gap-1 w-full" onClick={(e) => e.stopPropagation()}>
             <Euro className="w-3 h-3 text-zinc-500 flex-shrink-0" />
@@ -368,8 +374,8 @@ export default function ItemListItem({ item, selected, onToggle }: Props) {
         )}
       </div>
 
-      {/* Col 11 – Wert (w-20, lg+) */}
-      <div className="hidden lg:flex w-20 flex-shrink-0 items-center justify-end">
+      {/* Col 12 – Wert */}
+      <div className="hidden sm:flex items-center justify-end" style={fixed('wert')}>
         {editing === 'wert' ? (
           <span className="flex items-center gap-1 w-full" onClick={(e) => e.stopPropagation()}>
             <Euro className="w-3 h-3 text-zinc-500 flex-shrink-0" />
