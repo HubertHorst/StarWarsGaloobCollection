@@ -11,5 +11,6 @@ export interface Item {
   lieferung_ausstehend: number | null  // 0 = No, 1 = Yes
   cover_url: string | null
   user_photos: string[] | null
+  sort_order: number | null            // manuelle Reihenfolge (kleiner = weiter vorne); NULL = ans Ende
   created_at: string | null
 }

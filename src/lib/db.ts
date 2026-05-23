@@ -63,7 +63,11 @@ export async function initDb() {
       lieferung_ausstehend INTEGER DEFAULT 0,
       cover_url TEXT,
       user_photos TEXT,
+      sort_order INTEGER,
       created_at TEXT DEFAULT (datetime('now'))
     )
   `)
+  // Migration: column may not exist on older DBs
+  try { await db.execute(`ALTER TABLE items ADD COLUMN sort_order INTEGER`) } catch { /* exists */ }
+  try { await db.execute(`CREATE INDEX IF NOT EXISTS idx_items_sort_order ON items(sort_order)`) } catch {}
 }

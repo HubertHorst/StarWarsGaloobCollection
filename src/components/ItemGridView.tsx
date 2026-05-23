@@ -48,7 +48,10 @@ const SORT_LABELS: Record<SortField, string> = {
   manual:               'Manuell',
 }
 
-const MANUAL_ORDER_KEY = 'galoob-grid-manual-order'
+/** While a reorder is in flight, we use this local override to keep the
+ *  UI in sync. Cleared once the server-rendered items prop reflects the
+ *  new sort_order values. */
+type OrderOverride = Map<string, number>
 
 const sel = 'bg-zinc-800/70 text-zinc-300 text-xs rounded-lg px-2 py-1.5 outline-none ring-1 ring-white/10 focus:ring-yellow-500 cursor-pointer hover:bg-zinc-700/70 transition-colors'
 
@@ -71,9 +74,9 @@ export default function ItemGridView({ items: initialItems, editMode = false, in
   })
   const [sort, setSort] = useState<{ field: SortField; dir: SortDir }>({ field: 'name', dir: 'asc' })
 
-  // Manual drag-to-reorder state (persisted in localStorage as array of IDs)
-  const [manualOrder, setManualOrder] = useState<string[]>([])
-  const manualRestoredRef = useRef(false)
+  // Optimistic order override while a reorder POST is in flight
+  const [orderOverride, setOrderOverride] = useState<OrderOverride>(new Map())
+  const [reordering, setReordering] = useState(false)
 
   // Restore on mount; initialSerie (series detail view) overrides persisted serie filter
   useEffect(() => {
@@ -87,10 +90,7 @@ export default function ItemGridView({ items: initialItems, editMode = false, in
       }
       const s = sessionStorage.getItem('grid-sort')
       if (s) setSort(JSON.parse(s))
-      const m = localStorage.getItem(MANUAL_ORDER_KEY)
-      if (m) setManualOrder(JSON.parse(m))
     } catch { /* ignore */ }
-    manualRestoredRef.current = true
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -103,37 +103,69 @@ export default function ItemGridView({ items: initialItems, editMode = false, in
     sessionStorage.setItem('grid-sort', JSON.stringify(sort))
   }, [sort])
 
+  // When new items prop arrives (after router.refresh), clear the
+  // optimistic override since the server already reflects the new order.
   useEffect(() => {
-    if (!manualRestoredRef.current) return
-    try { localStorage.setItem(MANUAL_ORDER_KEY, JSON.stringify(manualOrder)) } catch {}
-  }, [manualOrder])
+    if (orderOverride.size > 0) setOrderOverride(new Map())
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialItems])
 
-  function manualPos(id: string): number {
-    if (manualOrder.length === 0) return Number.MAX_SAFE_INTEGER
-    const i = manualOrder.indexOf(id)
-    return i === -1 ? Number.MAX_SAFE_INTEGER : i
+  function effectiveOrder(item: Item): number {
+    const o = orderOverride.get(item.id)
+    if (o != null) return o
+    return item.sort_order ?? Number.MAX_SAFE_INTEGER
   }
 
-  /** Move srcId to the position immediately before targetId, keeping the
-   *  rest of the order intact. Initialises manualOrder from current items
-   *  if it's still empty (first manual move ever). */
-  function reorderManual(srcId: string, targetId: string) {
+  /** Move srcId to the position immediately before targetId in the
+   *  currently rendered list, then POST the new full order to the
+   *  server. Items not currently rendered (filtered out) keep their
+   *  previous sort_order. */
+  async function reorderManual(srcId: string, targetId: string, currentOrder: string[]) {
     if (srcId === targetId) return
-    const base = manualOrder.length > 0
-      ? [...manualOrder]
-      : initialItems.map((i) => i.id)
-    if (!base.includes(srcId)) base.push(srcId)
-    if (!base.includes(targetId)) base.push(targetId)
-    const srcIdx = base.indexOf(srcId)
-    base.splice(srcIdx, 1)
-    const tIdx = base.indexOf(targetId)
-    base.splice(tIdx, 0, srcId)
-    setManualOrder(base)
+    const newOrder = [...currentOrder]
+    const srcIdx = newOrder.indexOf(srcId)
+    if (srcIdx === -1) return
+    newOrder.splice(srcIdx, 1)
+    const tIdx = newOrder.indexOf(targetId)
+    if (tIdx === -1) return
+    newOrder.splice(tIdx, 0, srcId)
+
+    // Optimistic local update
+    const map = new Map<string, number>()
+    newOrder.forEach((id, idx) => map.set(id, idx * 10))
+    setOrderOverride(map)
+    setReordering(true)
+
+    try {
+      const r = await fetch('/api/items/reorder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order: newOrder }),
+      })
+      if (!r.ok) throw new Error('Server-Fehler beim Speichern der Reihenfolge')
+      router.refresh()
+    } catch (err) {
+      // Roll back override on failure
+      setOrderOverride(new Map())
+      console.error(err)
+    } finally {
+      setReordering(false)
+    }
   }
 
-  function resetManualOrder() {
-    setManualOrder([])
-    try { localStorage.removeItem(MANUAL_ORDER_KEY) } catch {}
+  async function resetManualOrder() {
+    if (!confirm('Manuelle Reihenfolge wirklich zurücksetzen? Sortierung wird auf Default zurückgestellt.')) return
+    setReordering(true)
+    try {
+      const r = await fetch('/api/items/reorder/clear', { method: 'POST' })
+      if (!r.ok) throw new Error('Reset fehlgeschlagen')
+      setOrderOverride(new Map())
+      router.refresh()
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setReordering(false)
+    }
   }
 
   const hasFilters = filters.name || filters.serie || filters.zustand || filters.lieferung || filters.sammlung
@@ -174,13 +206,13 @@ export default function ItemGridView({ items: initialItems, editMode = false, in
           case 'lieferung_ausstehend': return dir * ((a.lieferung_ausstehend ?? 0) - (b.lieferung_ausstehend ?? 0))
           case 'in_sammlung':          return dir * ((a.in_sammlung ?? 1) - (b.in_sammlung ?? 1))
           case 'manual': {
-            const m = manualPos(a.id) - manualPos(b.id)
+            const m = effectiveOrder(a) - effectiveOrder(b)
             return m !== 0 ? dir * m : compareNames(a.name, b.name)
           }
           default:                     return 0
         }
       })
-  }, [initialItems, filters, sort, manualOrder])
+  }, [initialItems, filters, sort, orderOverride])
 
   // Derive unique series list from actual items
   const series = useMemo(
@@ -327,16 +359,16 @@ export default function ItemGridView({ items: initialItems, editMode = false, in
         {manualMode && (
           <div className="mb-3 flex flex-wrap items-center gap-3 px-3 py-2 bg-indigo-500/10 border border-indigo-500/20 rounded-lg text-xs text-indigo-200">
             <Merge className="w-3.5 h-3.5 text-indigo-300" />
-            <span>Manuelle Reihenfolge — zieh Kacheln per Drag&amp;Drop um neu zu sortieren. Wird im Browser gespeichert.</span>
-            {manualOrder.length > 0 && (
-              <button
-                onClick={resetManualOrder}
-                className="ml-auto px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors"
-                title="Manuelle Reihenfolge verwerfen"
-              >
-                Zurücksetzen
-              </button>
-            )}
+            <span>Manuelle Reihenfolge — zieh Kacheln per Drag&amp;Drop um neu zu sortieren. Wird in der Datenbank gespeichert.</span>
+            {reordering && <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-300" />}
+            <button
+              onClick={resetManualOrder}
+              disabled={reordering}
+              className="ml-auto px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors disabled:opacity-40"
+              title="Sort-Order aller Artikel löschen"
+            >
+              Zurücksetzen
+            </button>
           </div>
         )}
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
@@ -344,10 +376,11 @@ export default function ItemGridView({ items: initialItems, editMode = false, in
             if (!manualMode) return <ItemCard key={item.id} item={item} />
             const isDragging = dragId === item.id
             const isOver = overId === item.id && dragId !== item.id
+            const currentOrder = filtered.map((i) => i.id)
             return (
               <div
                 key={item.id}
-                draggable
+                draggable={!reordering}
                 onDragStart={(e) => {
                   // Don't start drag if user grabs an interactive element
                   const el = e.target as HTMLElement
@@ -363,13 +396,16 @@ export default function ItemGridView({ items: initialItems, editMode = false, in
                 onDrop={(e) => {
                   e.preventDefault()
                   setOverId(null)
-                  if (dragId && dragId !== item.id) reorderManual(dragId, item.id)
+                  if (dragId && dragId !== item.id) {
+                    void reorderManual(dragId, item.id, currentOrder)
+                  }
                   setDragId(null)
                 }}
                 className={[
                   'rounded-xl cursor-grab active:cursor-grabbing transition-all duration-150 select-none',
                   isDragging ? 'opacity-40 scale-95' : '',
                   isOver     ? 'ring-2 ring-indigo-400 ring-offset-2 ring-offset-zinc-950 scale-[1.02]' : '',
+                  reordering ? 'pointer-events-none' : '',
                 ].join(' ')}
               >
                 <ItemCard item={item} />
