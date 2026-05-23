@@ -104,6 +104,14 @@ export default function ItemGridView({ items: initialItems, editMode = false, in
     sessionStorage.setItem('grid-sort', JSON.stringify(sort))
   }, [sort])
 
+  // Anonyme Besucher dürfen die "Manuell"-Reihenfolge nicht ändern;
+  // falls eine alte sessionStorage-Session noch 'manual' enthält, auf 'name' zurücksetzen.
+  useEffect(() => {
+    if (!isLoggedIn && sort.field === 'manual') {
+      setSort({ field: 'name', dir: 'asc' })
+    }
+  }, [isLoggedIn, sort.field])
+
   // When new items prop arrives (after router.refresh), clear the
   // optimistic override since the server already reflects the new order.
   useEffect(() => {
@@ -313,10 +321,10 @@ export default function ItemGridView({ items: initialItems, editMode = false, in
       {/* Divider */}
       <div className="hidden sm:block w-px h-5 bg-white/10 flex-shrink-0" />
 
-      {/* Sort field — Wert/Kaufpreis-Optionen nur für Logged-in */}
+      {/* Sort field — Wert/Kaufpreis/Manuell-Optionen nur für Logged-in */}
       <select value={sort.field} onChange={(e) => setSort((s) => ({ ...s, field: e.target.value as SortField }))} className={sel}>
         {(Object.entries(SORT_LABELS) as [SortField, string][])
-          .filter(([k]) => isLoggedIn || (k !== 'wert' && k !== 'kaufpreis'))
+          .filter(([k]) => isLoggedIn || (k !== 'wert' && k !== 'kaufpreis' && k !== 'manual'))
           .map(([k, v]) => (
             <option key={k} value={k}>{v}</option>
           ))}
@@ -355,7 +363,7 @@ export default function ItemGridView({ items: initialItems, editMode = false, in
 
   // ── Normal (non-edit) mode ─────────────────────────────────────────────────
   if (!editMode) {
-    const manualMode = sort.field === 'manual'
+    const manualMode = isLoggedIn && sort.field === 'manual'
     return (
       <>
         {toolbar}
