@@ -192,7 +192,7 @@ export default function ItemListView({ items }: Props) {
 
   return (
     <>
-    <div className="bg-zinc-900 rounded-xl border border-white/5 overflow-hidden">
+    <div className="bg-zinc-900 rounded-xl border border-white/5 overflow-x-auto">
 
       {/*
           Columns mirror ItemListItem: gap-3, same widths, same breakpoints
