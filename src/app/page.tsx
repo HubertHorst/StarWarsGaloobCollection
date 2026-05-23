@@ -66,7 +66,7 @@ export default async function LibraryPage({ searchParams }: Props) {
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
       <header className="sticky top-0 z-30 border-b border-white/5 bg-zinc-900/80 backdrop-blur">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-4">
+        <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2 min-w-0">
             {showSerieDetail ? (
               <>
@@ -114,7 +114,7 @@ export default async function LibraryPage({ searchParams }: Props) {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+      <main className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-6 space-y-6">
         <ScrollRestorer />
         <LibraryStateMemo />
 
