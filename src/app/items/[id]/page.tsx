@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation'
+import { getIsLoggedIn } from '@/lib/auth'
 import Link from 'next/link'
 import { ArrowLeft, Calendar, Hash, Truck, PackageCheck } from 'lucide-react'
 import BackToLibrary from '@/components/BackToLibrary'
@@ -73,6 +74,7 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ id:
 
   const { prev: fallbackPrev, next: fallbackNext } = await getNeighbours(item.id)
   const distinctSeries = await getDistinctSeries()
+  const isLoggedIn = await getIsLoggedIn()
 
   const coverUrl = item.cover_url ?? null
   const userPhotos = item.user_photos ?? []
@@ -96,8 +98,8 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ id:
             />
           </div>
           <div className="flex items-center gap-2">
-            <RefreshFromImageButton itemId={item.id} />
-            <DeleteItemButton itemId={item.id} />
+            {isLoggedIn && <RefreshFromImageButton itemId={item.id} />}
+            {isLoggedIn && <DeleteItemButton itemId={item.id} />}
           </div>
         </div>
       </header>
@@ -151,8 +153,8 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ id:
                   <span className="text-zinc-300">{item.set_nummer}</span>
                 </div>
               )}
-              <EditableValue itemId={item.id} field="kaufpreis" label="Kaufpreis" initialValue={item.kaufpreis} />
-              <EditableValue itemId={item.id} field="wert" label="Wert" initialValue={item.wert} />
+              {isLoggedIn && <EditableValue itemId={item.id} field="kaufpreis" label="Kaufpreis" initialValue={item.kaufpreis} />}
+              {isLoggedIn && <EditableValue itemId={item.id} field="wert" label="Wert" initialValue={item.wert} />}
             </div>
 
             {/* In Sammlung vorhanden */}
@@ -164,7 +166,7 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ id:
                   {item.in_sammlung === 0 ? 'Fehlt in der Sammlung' : 'Vorhanden'}
                 </p>
               </div>
-              <SammlungToggle itemId={item.id} initialValue={item.in_sammlung ?? 1} />
+              {isLoggedIn && <SammlungToggle itemId={item.id} initialValue={item.in_sammlung ?? 1} />}
             </div>
 
             {/* Lieferung ausstehend */}
@@ -176,7 +178,7 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ id:
                   <p className="text-xs text-yellow-400 mt-0.5">Dieser Artikel wurde noch nicht geliefert</p>
                 )}
               </div>
-              <LieferungToggle itemId={item.id} initialValue={item.lieferung_ausstehend ?? 0} />
+              {isLoggedIn && <LieferungToggle itemId={item.id} initialValue={item.lieferung_ausstehend ?? 0} />}
             </div>
           </div>
         </div>
@@ -185,7 +187,7 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ id:
         <section className="mt-10 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">Fotos</h2>
-            <UploadPhotoButton itemId={item.id} />
+            {isLoggedIn && <UploadPhotoButton itemId={item.id} />}
           </div>
 
           {allGallery.length > 0 ? (

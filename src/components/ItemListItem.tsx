@@ -18,9 +18,11 @@ interface Props {
   onToggle?: () => void
   /** Column widths from ItemListView. Falls back to defaults if missing. */
   widths?: ColWidths
+  /** Wert + Kaufpreis cells + edit pencils are hidden when false. */
+  isLoggedIn?: boolean
 }
 
-export default function ItemListItem({ item, selected, onToggle, widths = DEFAULT_COL_WIDTHS }: Props) {
+export default function ItemListItem({ item, selected, onToggle, widths = DEFAULT_COL_WIDTHS, isLoggedIn = false }: Props) {
   // Style helper — every column is explicit-width and non-shrinking, so
   // header/filter/row cells line up exactly.
   const fixed = (key: keyof ColWidths): React.CSSProperties => ({ width: widths[key], minWidth: widths[key], flexShrink: 0 })
@@ -57,6 +59,7 @@ export default function ItemListItem({ item, selected, onToggle, widths = DEFAUL
   function startEdit(field: EditingField, e: React.MouseEvent) {
     e.preventDefault()
     e.stopPropagation()
+    if (!isLoggedIn) return // read-only for anonymous viewers
     setEditing(field)
   }
 
@@ -338,7 +341,8 @@ export default function ItemListItem({ item, selected, onToggle, widths = DEFAUL
         <RefreshFromImageButton itemId={item.id} compact />
       </div>
 
-      {/* Col 11 – Kaufpreis */}
+      {/* Col 11 – Kaufpreis (nur für eingeloggte User) */}
+      {isLoggedIn && (
       <div className="hidden sm:flex items-center justify-end" style={fixed('kauf')}>
         {editing === 'kaufpreis' ? (
           <span className="flex items-center gap-1 w-full" onClick={(e) => e.stopPropagation()}>
@@ -373,8 +377,10 @@ export default function ItemListItem({ item, selected, onToggle, widths = DEFAUL
           </span>
         )}
       </div>
+      )}
 
-      {/* Col 12 – Wert */}
+      {/* Col 12 – Wert (nur für eingeloggte User) */}
+      {isLoggedIn && (
       <div className="hidden sm:flex items-center justify-end" style={fixed('wert')}>
         {editing === 'wert' ? (
           <span className="flex items-center gap-1 w-full" onClick={(e) => e.stopPropagation()}>
@@ -409,6 +415,7 @@ export default function ItemListItem({ item, selected, onToggle, widths = DEFAUL
           </span>
         )}
       </div>
+      )}
     </div>
   )
 }

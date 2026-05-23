@@ -1,8 +1,9 @@
 import Link from 'next/link'
-import { Layers, Star, ChevronLeft } from 'lucide-react'
+import { Layers, Star, ChevronLeft, LogIn } from 'lucide-react'
 import EditModeToggle from '@/components/EditModeToggle'
 import { getDb, initDb } from '@/lib/db'
 import { safeParseJson } from '@/lib/validate'
+import { getIsLoggedIn } from '@/lib/auth'
 import ItemGridView from '@/components/ItemGridView'
 import ItemListView from '@/components/ItemListView'
 import ItemSeriesView from '@/components/ItemSeriesView'
@@ -10,6 +11,7 @@ import ViewToggle from '@/components/ViewToggle'
 import ChangelogPanel from '@/components/ChangelogPanel'
 import ScrollRestorer from '@/components/ScrollRestorer'
 import LibraryStateMemo from '@/components/LibraryStateMemo'
+import LogoutButton from '@/components/LogoutButton'
 import { Item } from '@/types/item'
 import { sortItems } from '@/lib/sortItems'
 
@@ -45,11 +47,13 @@ async function getItems(): Promise<Item[]> {
 
 export default async function LibraryPage({ searchParams }: Props) {
   const { view, edit, serie } = await searchParams
+  const isLoggedIn = await getIsLoggedIn()
 
   // Serienansicht ist die Landing Page (Standard)
   const currentView: View = view === 'list' ? 'list' : view === 'grid' ? 'grid' : 'series'
   // editMode is active in grid view OR in a series detail view (which always renders as grid)
-  const editMode = edit === '1' && (currentView === 'grid' || !!serie)
+  // — and only for logged-in users
+  const editMode = isLoggedIn && edit === '1' && (currentView === 'grid' || !!serie)
 
   const allItems = await getItems()
 
@@ -97,19 +101,32 @@ export default async function LibraryPage({ searchParams }: Props) {
           </div>
 
           <div className="flex items-center gap-2 flex-shrink-0">
-            <ChangelogPanel />
+            {isLoggedIn && <ChangelogPanel />}
             {!showSerieDetail && <ViewToggle current={currentView} />}
-            {(showSerieDetail || currentView === 'grid') && (
+            {isLoggedIn && (showSerieDetail || currentView === 'grid') && (
               <EditModeToggle editMode={editMode} />
             )}
-            <Link
-              href="/bulk"
-              className="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-            >
-              <Layers className="w-4 h-4" />
-              <span className="hidden sm:inline">Set hinzufügen</span>
-              <span className="sm:hidden">Neu</span>
-            </Link>
+            {isLoggedIn ? (
+              <>
+                <Link
+                  href="/bulk"
+                  className="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+                >
+                  <Layers className="w-4 h-4" />
+                  <span className="hidden sm:inline">Set hinzufügen</span>
+                  <span className="sm:hidden">Neu</span>
+                </Link>
+                <LogoutButton />
+              </>
+            ) : (
+              <Link
+                href="/login"
+                className="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+              >
+                <LogIn className="w-4 h-4" />
+                <span className="hidden sm:inline">Login</span>
+              </Link>
+            )}
           </div>
         </div>
       </header>
@@ -123,24 +140,36 @@ export default async function LibraryPage({ searchParams }: Props) {
             <Star className="w-16 h-16 text-zinc-700" />
             <div>
               <p className="text-zinc-400 text-lg font-medium">Deine Sammlung ist leer</p>
-              <p className="text-zinc-600 text-sm mt-1">Füge deinen ersten Artikel hinzu</p>
+              <p className="text-zinc-600 text-sm mt-1">
+                {isLoggedIn ? 'Füge deinen ersten Artikel hinzu' : 'Login um Artikel hinzuzufügen'}
+              </p>
             </div>
-            <Link
-              href="/bulk"
-              className="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-500 text-white text-sm font-medium px-5 py-2.5 rounded-lg transition-colors mt-2"
-            >
-              <Layers className="w-4 h-4" />
-              Erstes Set hinzufügen
-            </Link>
+            {isLoggedIn ? (
+              <Link
+                href="/bulk"
+                className="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-500 text-white text-sm font-medium px-5 py-2.5 rounded-lg transition-colors mt-2"
+              >
+                <Layers className="w-4 h-4" />
+                Erstes Set hinzufügen
+              </Link>
+            ) : (
+              <Link
+                href="/login"
+                className="flex items-center gap-2 bg-yellow-600 hover:bg-yellow-500 text-white text-sm font-medium px-5 py-2.5 rounded-lg transition-colors mt-2"
+              >
+                <LogIn className="w-4 h-4" />
+                Login
+              </Link>
+            )}
           </div>
         ) : showSerieDetail ? (
           // Serie detail: pass ALL items so series dropdown is fully populated;
           // initialSerie pre-selects the current series filter in the toolbar.
-          <ItemGridView items={allItems} editMode={editMode} initialSerie={serieFilter ?? ''} />
+          <ItemGridView items={allItems} editMode={editMode} initialSerie={serieFilter ?? ''} isLoggedIn={isLoggedIn} />
         ) : currentView === 'list' ? (
-          <ItemListView items={allItems} />
+          <ItemListView items={allItems} isLoggedIn={isLoggedIn} />
         ) : currentView === 'grid' ? (
-          <ItemGridView items={allItems} editMode={editMode} />
+          <ItemGridView items={allItems} editMode={editMode} isLoggedIn={isLoggedIn} />
         ) : (
           // series = default landing page
           <ItemSeriesView items={allItems} />

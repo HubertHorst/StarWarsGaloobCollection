@@ -16,6 +16,7 @@ import {
 
 interface Props {
   items: Item[]
+  isLoggedIn?: boolean
 }
 
 type SortField = 'name' | 'zustand' | 'serie' | 'jahr' | 'set_nummer' | 'kaufpreis' | 'wert' | 'lieferung_ausstehend' | 'in_sammlung'
@@ -26,7 +27,7 @@ function parseValue(v: string | null): number {
   return parseFloat(v.replace(',', '.').replace(/[^0-9.]/g, '')) || 0
 }
 
-export default function ItemListView({ items }: Props) {
+export default function ItemListView({ items, isLoggedIn = false }: Props) {
   const [filters, setFilters] = useState({ name: '', zustand: '', serie: '', jahr: '', set_nummer: '', wert: '', lieferung: '', sammlung: '' })
   const [sort, setSort] = useState<{ field: SortField; dir: SortDir }>({ field: 'name', dir: 'asc' })
   const [selectedIds, setSelectedIds] = useState<string[]>([])
@@ -369,8 +370,8 @@ export default function ItemListView({ items }: Props) {
         ))
       )}
 
-      {/* Total footer */}
-      {(itemsWithWert > 0 || itemsWithKaufpreis > 0) && (
+      {/* Total footer — only for logged-in users */}
+      {isLoggedIn && (itemsWithWert > 0 || itemsWithKaufpreis > 0) && (
         <div className="border-t border-white/10 px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-1 text-xs text-zinc-500">
           <span>{filtered.length} von {items.length} Artikeln</span>
           <span className="flex-1" />
@@ -405,7 +406,7 @@ export default function ItemListView({ items }: Props) {
       )}
     </div>
 
-    <BulkActionBar selectedIds={selectedIds} onClear={() => setSelectedIds([])} items={items} />
+    {isLoggedIn && <BulkActionBar selectedIds={selectedIds} onClear={() => setSelectedIds([])} items={items} />}
     </>
   )
 }

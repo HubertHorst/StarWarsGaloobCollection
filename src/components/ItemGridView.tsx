@@ -15,6 +15,7 @@ interface Props {
   items: Item[]
   editMode?: boolean
   initialSerie?: string   // pre-select series filter (series detail view)
+  isLoggedIn?: boolean    // gates Wert/Kaufpreis visibility + edit features
 }
 
 interface PendingMerge { source: Item; target: Item }
@@ -55,7 +56,7 @@ type OrderOverride = Map<string, number>
 
 const sel = 'bg-zinc-800/70 text-zinc-300 text-xs rounded-lg px-2 py-1.5 outline-none ring-1 ring-white/10 focus:ring-yellow-500 cursor-pointer hover:bg-zinc-700/70 transition-colors'
 
-export default function ItemGridView({ items: initialItems, editMode = false, initialSerie }: Props) {
+export default function ItemGridView({ items: initialItems, editMode = false, initialSerie, isLoggedIn = false }: Props) {
   const router = useRouter()
 
   const [selectedIds, setSelectedIds] = useState<string[]>([])
@@ -312,11 +313,13 @@ export default function ItemGridView({ items: initialItems, editMode = false, in
       {/* Divider */}
       <div className="hidden sm:block w-px h-5 bg-white/10 flex-shrink-0" />
 
-      {/* Sort field */}
+      {/* Sort field — Wert/Kaufpreis-Optionen nur für Logged-in */}
       <select value={sort.field} onChange={(e) => setSort((s) => ({ ...s, field: e.target.value as SortField }))} className={sel}>
-        {(Object.entries(SORT_LABELS) as [SortField, string][]).map(([k, v]) => (
-          <option key={k} value={k}>{v}</option>
-        ))}
+        {(Object.entries(SORT_LABELS) as [SortField, string][])
+          .filter(([k]) => isLoggedIn || (k !== 'wert' && k !== 'kaufpreis'))
+          .map(([k, v]) => (
+            <option key={k} value={k}>{v}</option>
+          ))}
       </select>
 
       {/* Sort direction toggle */}
