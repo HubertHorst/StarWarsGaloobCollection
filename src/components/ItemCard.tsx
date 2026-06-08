@@ -36,6 +36,7 @@ export default function ItemCard({ item, selected, onToggle }: Props) {
       <Link
         href={`/items/${item.id}`}
         className="block"
+        draggable={false}
         onClick={() => sessionStorage.setItem('library-scroll', String(window.scrollY))}
       >
       <div className={`relative aspect-[3/4] rounded-xl overflow-hidden bg-zinc-800 shadow-lg transition-all duration-200 group-hover:shadow-xl group-hover:-translate-y-1 ${statusRing(item, selected)}`}>
