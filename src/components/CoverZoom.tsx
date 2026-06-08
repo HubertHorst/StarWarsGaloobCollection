@@ -44,7 +44,7 @@ export default function CoverZoom({ src, alt, sizes = '192px', priority = false,
 
   return (
     <>
-      <Image src={src} alt={alt} fill className="object-contain" sizes={sizes} priority={priority} />
+      <Image src={src} alt={alt} fill className="object-contain" sizes={sizes} priority={priority} draggable={false} />
 
       <div className="absolute inset-0 pointer-events-none">
         <button

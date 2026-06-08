@@ -400,6 +400,9 @@ export default function ItemGridView({ items: initialItems, editMode = false, in
                   }
                   setDragId(item.id)
                   e.dataTransfer.effectAllowed = 'move'
+                  // Explicitly mark what is being dragged (overrides any img/link default data)
+                  e.dataTransfer.clearData()
+                  e.dataTransfer.setData('text/plain', item.id)
                 }}
                 onDragEnd={() => { setDragId(null); setOverId(null) }}
                 onDragOver={(e) => { e.preventDefault(); if (item.id !== dragId) setOverId(item.id) }}
