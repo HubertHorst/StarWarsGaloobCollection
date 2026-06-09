@@ -12,6 +12,13 @@ import { ColWidths, DEFAULT_COL_WIDTHS } from '@/lib/itemListColumns'
 
 type EditingField = 'name' | 'zustand' | 'serie' | 'wert' | 'kaufpreis' | null
 
+function formatPrice(v: string | null | undefined): string {
+  if (!v && v !== '0') return ''
+  const n = parseFloat(String(v).replace(',', '.'))
+  if (isNaN(n)) return v ?? ''
+  return n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
 interface Props {
   item: Item
   selected?: boolean
@@ -360,10 +367,10 @@ export default function ItemListItem({ item, selected, onToggle, widths = DEFAUL
           </span>
         ) : (
           <span className="flex items-center gap-1 justify-end w-full">
-            {item.kaufpreis ? (
+            {formatPrice(item.kaufpreis) ? (
               <>
                 <Euro className="w-3 h-3 text-zinc-500" />
-                <span className="text-zinc-500 text-xs">{item.kaufpreis}</span>
+                <span className="text-zinc-500 text-xs">{formatPrice(item.kaufpreis)}</span>
               </>
             ) : (
               <span className="text-zinc-700 italic text-xs">—</span>
@@ -398,10 +405,10 @@ export default function ItemListItem({ item, selected, onToggle, widths = DEFAUL
           </span>
         ) : (
           <span className="flex items-center gap-1 justify-end w-full">
-            {item.wert ? (
+            {formatPrice(item.wert) ? (
               <>
                 <Euro className="w-3 h-3 text-zinc-500" />
-                <span className="text-zinc-400 text-xs">{item.wert}</span>
+                <span className="text-zinc-400 text-xs">{formatPrice(item.wert)}</span>
               </>
             ) : (
               <span className="text-zinc-700 italic text-xs">—</span>

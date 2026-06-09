@@ -11,6 +11,13 @@ interface Props {
   initialValue: string | null
 }
 
+function formatPrice(v: string | null): string {
+  if (!v && v !== '0') return ''
+  const n = parseFloat(String(v).replace(',', '.'))
+  if (isNaN(n)) return v ?? ''
+  return n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
 export default function EditableValue({ itemId, field, label, initialValue }: Props) {
   const router = useRouter()
   const [editing, setEditing] = useState(false)
@@ -89,7 +96,7 @@ export default function EditableValue({ itemId, field, label, initialValue }: Pr
     <div className="group flex items-center gap-2 text-sm">
       <span className="text-zinc-500 text-xs">{label}</span>
       <Euro className="w-4 h-4 text-zinc-500" />
-      <span className="text-zinc-300">{value || <span className="text-zinc-600 italic">kein Wert</span>}</span>
+      <span className="text-zinc-300">{formatPrice(value) || <span className="text-zinc-600 italic">kein Wert</span>}</span>
       <button
         onClick={() => setEditing(true)}
         className="p-1 rounded-md text-zinc-600 hover:text-zinc-300 hover:bg-zinc-800 opacity-0 group-hover:opacity-100 transition-all"
