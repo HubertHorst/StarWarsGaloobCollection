@@ -366,6 +366,7 @@ export default function ItemListView({ items, isLoggedIn = false }: Props) {
             selected={selectedIds.includes(item.id)}
             onToggle={() => toggleSelect(item.id)}
             widths={widths}
+            isLoggedIn={isLoggedIn}
           />
         ))
       )}

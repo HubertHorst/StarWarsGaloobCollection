@@ -105,15 +105,15 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ id:
       </header>
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
-        <div className="flex flex-col sm:flex-row gap-8">
+        <div className="flex flex-col lg:flex-row gap-8">
           {/* Cover */}
           <div className="flex-shrink-0 flex flex-col gap-4">
-            <div className="group relative w-48 aspect-[3/4] rounded-2xl overflow-hidden bg-zinc-800 ring-1 ring-white/10 shadow-2xl mx-auto sm:mx-0">
+            <div className="group relative w-64 sm:w-[480px] aspect-[3/4] rounded-2xl overflow-hidden bg-zinc-800 ring-1 ring-white/10 shadow-2xl mx-auto lg:mx-0">
               {coverUrl ? (
                 <CoverZoom
                   src={coverUrl}
                   alt={item.name}
-                  sizes="192px"
+                  sizes="(max-width: 640px) 256px, 480px"
                   priority
                   images={[coverUrl, ...userPhotos.filter((u) => u !== coverUrl)].filter(Boolean)}
                 />

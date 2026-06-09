@@ -18,6 +18,9 @@ export const SERIES_PRESETS = [
   'Micro Machines : Original 3 Pack',
   'Micro Machines : Mini Heads',
   'Micro Machines : Gift Sets',
+  'Micro Machines : X-Ray',
+  'Micro Machines : Die Cast',
+  'Micro Machines : Epic Collections',
 ] as const
 
 export type SeriesPreset = (typeof SERIES_PRESETS)[number]
