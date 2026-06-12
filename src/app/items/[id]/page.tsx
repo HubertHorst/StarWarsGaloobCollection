@@ -9,6 +9,7 @@ import { safeParseJson } from '@/lib/validate'
 import { Item } from '@/types/item'
 import UploadPhotoButton from '@/components/UploadPhotoButton'
 import DeleteItemButton from '@/components/DeleteItemButton'
+import DuplicateItemButton from '@/components/DuplicateItemButton'
 import ImageGallery from '@/components/ImageGallery'
 import EditableTitle from '@/components/EditableTitle'
 import EditableValue from '@/components/EditableValue'
@@ -99,6 +100,7 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ id:
           </div>
           <div className="flex items-center gap-2">
             {isLoggedIn && <RefreshFromImageButton itemId={item.id} />}
+            {isLoggedIn && <DuplicateItemButton itemId={item.id} />}
             {isLoggedIn && <DeleteItemButton itemId={item.id} />}
           </div>
         </div>
