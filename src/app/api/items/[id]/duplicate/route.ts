@@ -8,6 +8,17 @@ function safeParseJson<T>(val: unknown): T | null {
   try { return JSON.parse(val as string) as T } catch { return null }
 }
 
+function str(v: unknown): string | null {
+  if (v === null || v === undefined) return null
+  return String(v)
+}
+
+function num(v: unknown): number | null {
+  if (v === null || v === undefined) return null
+  const n = Number(v)
+  return isNaN(n) ? null : n
+}
+
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const db = await getDbReady()
@@ -26,17 +37,17 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
         newId,
-        src.name as string,
-        src.serie ?? null,
-        src.set_nummer ?? null,
-        src.jahr ?? null,
-        src.zustand ?? null,
-        src.wert ?? null,
-        src.kaufpreis ?? null,
-        src.in_sammlung ?? 1,
-        src.lieferung_ausstehend ?? 0,
-        src.cover_url ?? null,
-        src.user_photos ?? null,
+        str(src.name) ?? '',
+        str(src.serie),
+        str(src.set_nummer),
+        num(src.jahr),
+        str(src.zustand),
+        str(src.wert),
+        str(src.kaufpreis),
+        num(src.in_sammlung) ?? 1,
+        num(src.lieferung_ausstehend) ?? 0,
+        str(src.cover_url),
+        str(src.user_photos),
       ],
     })
 
